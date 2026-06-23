@@ -1,0 +1,15 @@
+# 平台預設；移植 Halo 只改這裡
+mode: hub                 # hub=首頁可切換 / single=鎖定一個租戶
+active_tenant: project1_cute_dragon   # single 模式時生效
+llm:
+  provider: ollama
+  model: qwen2.5vl:3b     # 開發用現有模型；Halo 改 qwen2.5:14b
+  base_url: http://localhost:11434
+embedding:
+  model: nomic-embed-text # 開發用；Halo 改 bge-m3
+server:
+  port: 8080
+  default_lang: zh-TW
+retrieval:
+  top_k: 4
+  min_score: 0.35         # 低於此視為「沒命中」→ grounding fallback
