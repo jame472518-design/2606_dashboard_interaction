@@ -1,0 +1,6 @@
+display_name: "小恐龍樂園"
+persona_file: persona/guide.md
+languages: [zh-TW, en]
+ui:
+  default_view: showcase
+  voice_first: false
