@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { resolveConfig } from '../src/config.js';
 
 const ROOT = fileURLToPath(new URL('./fixtures/', import.meta.url));
@@ -8,7 +9,7 @@ const ROOT = fileURLToPath(new URL('./fixtures/', import.meta.url));
 test('tenant 覆寫 llm.model，未覆寫的吃 global', async () => {
   const cfg = await resolveConfig('t_demo', {
     globalPath: fileURLToPath(new URL('./fixtures/global.yaml', import.meta.url)),
-    tenantsDir: ROOT + 'tenants',
+    tenantsDir: path.join(ROOT, 'tenants'),
   });
   assert.equal(cfg.llm.model, 'override-model');
   assert.equal(cfg.llm.base_url, 'http://localhost:11434');

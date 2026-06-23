@@ -20,9 +20,9 @@ function merge(base, over) {
 export async function resolveConfig(tenantName, opts = {}) {
   const globalPath = opts.globalPath || path.join(REPO, 'config', 'global.yaml');
   const tenantsDir = opts.tenantsDir || path.join(REPO, 'tenants');
-  const global = await readYaml(globalPath);
+  const baseCfg = await readYaml(globalPath);
   const tenant = await readYaml(path.join(tenantsDir, tenantName, 'tenant.yaml'));
-  const cfg = merge(global, tenant);
+  const cfg = merge(baseCfg, tenant);
   cfg.tenantName = tenantName;
   cfg.tenantDir = path.join(tenantsDir, tenantName);
   return cfg;
