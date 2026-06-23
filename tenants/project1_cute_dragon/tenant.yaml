@@ -4,3 +4,8 @@ languages: [zh-TW, en]
 ui:
   default_view: showcase
   voice_first: false
+voice:                    # 覆寫全域語音預設；小恐龍走童趣高音、語速略快
+  pitch: 1.25
+  rate: 1.05
+  zh_voice: "Hanhan"      # 偏好繁中女聲
+  en_voice: "Zira"

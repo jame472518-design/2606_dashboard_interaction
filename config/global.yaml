@@ -14,3 +14,9 @@ retrieval:
   top_k: 4
   min_score: 0.45         # 低於此視為「沒命中」→ grounding fallback
                           # bge-m3 實測：相關問題 ≥0.62、無關 ≤0.38，0.45 落在空檔中央
+voice:                    # 語音預設（前端瀏覽器 TTS）；每個 tenant 可在 tenant.yaml 覆寫
+  enabled: true           # 是否自動念出回覆
+  rate: 1.0               # 語速 0.5–2.0
+  pitch: 1.1              # 音調 0–2（高=童趣、低=沉穩）
+  zh_voice: ""            # 指定中文語音名稱片段（空=自動選；例 "Hanhan"）
+  en_voice: ""            # 指定英文語音名稱片段（空=自動選；例 "Zira"）

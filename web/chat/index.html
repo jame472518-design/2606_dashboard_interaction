@@ -46,9 +46,17 @@ $('zh').onclick=()=>setLang('zh-TW'); $('en').onclick=()=>setLang('en');
 
 /* ===================== 語音 TTS（瀏覽器內建、離線） ===================== */
 let ttsOn=true, VOICES=[];
+// 語音設定（來自 global.yaml + tenant.yaml 合併，可逐租戶覆寫語調/語速/指定語音）
+let VOICECFG={ rate:1.0, pitch:1.1, zh_voice:'', en_voice:'' };
+fetch(`/api/tenant-config?tenant=${encodeURIComponent(tenant)}`).then(r=>r.json()).then(c=>{
+  if(c && c.voice){ VOICECFG={ ...VOICECFG, ...c.voice };
+    if(c.voice.enabled===false){ ttsOn=false; $('spk').textContent='🔇'; $('spk').classList.remove('on'); } }
+}).catch(()=>{});
 function loadVoices(){ try{ VOICES = window.speechSynthesis ? speechSynthesis.getVoices() : []; }catch(e){ VOICES=[]; } }
 loadVoices(); if(window.speechSynthesis) speechSynthesis.onvoiceschanged = loadVoices;
 function pickVoice(want){ const pre=want.slice(0,2).toLowerCase();
+  const want2 = pre==='zh' ? VOICECFG.zh_voice : VOICECFG.en_voice;   // tenant 指定的語音名稱片段優先
+  if(want2){ const byName=VOICES.find(v=>v.name && v.name.includes(want2)); if(byName) return byName; }
   return VOICES.find(v=>v.lang===want) || VOICES.find(v=>v.lang && v.lang.toLowerCase().startsWith(pre)) || null; }
 $('spk').onclick=()=>{ ttsOn=!ttsOn; $('spk').textContent = ttsOn?'🔊':'🔇'; $('spk').classList.toggle('on',ttsOn);
   if(!ttsOn && window.speechSynthesis) speechSynthesis.cancel(); };
@@ -93,7 +101,7 @@ function speak(textReply){
     const u=new SpeechSynthesisUtterance(text);
     u.lang = lang==='en' ? 'en-US' : 'zh-TW';
     const v=pickVoice(u.lang); if(v) u.voice=v;
-    u.rate=1.0; u.pitch=1.25;                                    // 音調略高，較童趣
+    u.rate=VOICECFG.rate||1.0; u.pitch=VOICECFG.pitch||1.1;      // 語調/語速來自設定檔
     u.onstart=()=>{ talking=true; };
     u.onend=()=>{ talking=false; };
     u.onerror=()=>{ talking=false; talkUntil=performance.now()+estMs; };
