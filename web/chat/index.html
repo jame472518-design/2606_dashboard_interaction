@@ -37,9 +37,14 @@ $('zh').onclick=()=>setLang('zh-TW'); $('en').onclick=()=>setLang('en');
 function add(role,text){ const d=document.createElement('div'); d.className='msg '+(role==='user'?'me':'bot');
   d.textContent=text; $('log').appendChild(d); $('log').scrollTop=$('log').scrollHeight; }
 async function sendMsg(){ const text=$('inp').value.trim(); if(!text) return; $('inp').value='';
-  add('user',text); history.push({role:'user',content:text});
-  const res=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({tenant,message:text,history,lang})}).then(r=>r.json());
+  add('user',text);
+  // 送出時 history 只含「先前」對話；當前訊息由 message 帶、server 端再附加，避免重複
+  let res;
+  try {
+    res=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({tenant,message:text,history,lang})}).then(r=>r.json());
+  } catch(e){ add('assistant', lang==='en'?'(network error)':'（連線出錯了）'); return; }
+  history.push({role:'user',content:text});
   add('assistant',res.reply); history.push({role:'assistant',content:res.reply}); }
 $('send').onclick=sendMsg; $('inp').addEventListener('keydown',e=>{ if(e.key==='Enter') sendMsg(); });
 setLang('zh-TW');

@@ -62,6 +62,7 @@ export function createServer() {
       if (req.method === 'POST' && url.pathname === '/api/chat') {
         const { tenant, message, history, lang } = await readBody(req);
         if (!tenant || !message) return send(res, 400, { error: 'tenant 與 message 為必填' });
+        if (!/^[\w-]+$/.test(tenant)) return send(res, 400, { error: 'invalid tenant' });
         const result = await answer({ tenantName: tenant, message, history, lang });
         return send(res, 200, result);
       }
