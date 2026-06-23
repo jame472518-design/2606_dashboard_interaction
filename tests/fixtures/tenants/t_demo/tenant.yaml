@@ -1,0 +1,5 @@
+display_name: "示範館"
+persona_file: persona/guide.md
+languages: [zh-TW, en]
+llm:
+  model: override-model
