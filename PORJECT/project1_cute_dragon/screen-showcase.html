@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小恐龍互動 IP · 初步畫面 (Phase 1 · 狀態 A)</title>
+<style>
+  :root{
+    --green:#7CB36A; --green-dark:#4f8a45; --cream:#FBF3E2; --peach:#F7B7A8;
+    --ink:#3b4a36; --sky:#cdeef0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:"Baloo 2","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+    background:
+      radial-gradient(120% 80% at 50% 0%, #fffaf0 0%, var(--cream) 55%, #efe2c6 100%);
+    color:var(--ink); user-select:none; cursor:default;
+  }
+  /* 飄浮裝飾 */
+  .blob{position:fixed;border-radius:50%;filter:blur(1px);opacity:.5;z-index:0}
+  .b1{width:180px;height:180px;background:#bfe3b0;top:-40px;left:-40px}
+  .b2{width:120px;height:120px;background:#fcd5c8;top:12%;right:6%}
+  .b3{width:220px;height:220px;background:#cfeef0;bottom:-70px;right:-50px;opacity:.45}
+  .b4{width:90px;height:90px;background:#ffe6a8;bottom:14%;left:7%}
+
+  .stage{position:relative;z-index:1;height:100%;display:flex;flex-direction:column}
+
+  /* 頂列 */
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:22px 30px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.15rem;color:var(--green-dark)}
+  .logo .dot{width:34px;height:34px;border-radius:50%;background:var(--green);
+    display:grid;place-items:center;color:#fff;font-size:1.1rem;box-shadow:0 4px 0 #4f8a45}
+  .lang{display:flex;background:#fff;border-radius:999px;padding:4px;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+  .lang button{border:0;background:transparent;font-weight:800;font-size:.95rem;color:#9aa898;
+    padding:7px 16px;border-radius:999px;cursor:pointer;transition:.2s}
+  .lang button.on{background:var(--green);color:#fff}
+
+  /* 中央形象 */
+  .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+  .bubble{
+    position:relative;background:#fff;border-radius:26px;padding:18px 28px;max-width:560px;text-align:center;
+    font-size:1.7rem;font-weight:800;color:var(--green-dark);line-height:1.4;
+    box-shadow:0 10px 30px rgba(0,0,0,.10); animation:pop .4s ease;
+  }
+  .bubble::after{content:"";position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);
+    border:14px solid transparent;border-top-color:#fff;border-bottom:0}
+  .bubble .sub{display:block;font-size:1.05rem;font-weight:700;color:#9aa898;margin-top:4px}
+
+  .dragon-wrap{position:relative;cursor:pointer}
+  .dragon{
+    width:min(46vh,420px);height:auto;display:block;filter:drop-shadow(0 22px 26px rgba(80,120,60,.30));
+    animation:bob 3.2s ease-in-out infinite; border-radius:30px;
+  }
+  .tap-hint{position:absolute;right:-6px;top:8px;background:var(--peach);color:#fff;font-weight:800;
+    font-size:.8rem;padding:6px 12px;border-radius:999px;box-shadow:0 4px 0 #e09384;animation:bob 2.4s ease-in-out infinite}
+
+  /* 底部按鈕 */
+  .actions{display:flex;gap:22px;justify-content:center;padding:0 0 46px}
+  .btn{display:flex;align-items:center;gap:12px;border:0;cursor:pointer;
+    font-family:inherit;font-weight:800;font-size:1.45rem;color:#fff;
+    padding:20px 40px;border-radius:26px;transition:transform .12s}
+  .btn:active{transform:translateY(3px)}
+  .btn .ic{font-size:1.6rem}
+  .btn-chat{background:var(--green);box-shadow:0 6px 0 #4f8a45}
+  .btn-talk{background:#7cc0c8;box-shadow:0 6px 0 #4f8e96;position:relative}
+  .btn-talk .soon{position:absolute;top:-12px;right:-10px;background:#ffb24a;color:#5a3a00;
+    font-size:.7rem;padding:3px 9px;border-radius:999px;box-shadow:0 3px 0 #d98e2e}
+
+  .stamp{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:2;
+    font-size:.72rem;color:#b3a98f;font-weight:700;text-align:center}
+
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+  @keyframes pop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+  <div class="blob b1"></div><div class="blob b2"></div>
+  <div class="blob b3"></div><div class="blob b4"></div>
+
+  <div class="stage">
+    <div class="topbar">
+      <div class="logo"><span class="dot">🦕</span><span id="venue">小恐龍樂園</span></div>
+      <div class="lang">
+        <button id="zh" class="on" onclick="setLang('zh')">中文</button>
+        <button id="en" onclick="setLang('en')">EN</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="bubble" id="bubble"></div>
+      <div class="dragon-wrap" onclick="poke()">
+        <img class="dragon" id="dragon" src="character/portrait/idle.png" alt="小恐龍">
+        <span class="tap-hint" id="hint">點我！</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-chat" onclick="poke()">
+        <span class="ic">⌨️</span><span id="b-chat">跟我聊天</span>
+      </button>
+      <button class="btn btn-talk" onclick="poke()">
+        <span class="ic">🎤</span><span id="b-talk">對我說話</span>
+        <span class="soon" id="soon">Phase 2</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="stamp" id="stamp">初步原型 · 你的原創角色，目前用截圖裁切版；正式上線建議換成去背高解析原檔</div>
+
+<script>
+  // === 初步原型：示範「全螢幕形象 + 表情切換 + 雙語」 ===
+  // 之後這些文字會來自 persona/knowledge，表情由對話狀態驅動。
+  const T = {
+    zh:{
+      venue:"小恐龍樂園",
+      hint:"點我！",
+      bChat:"跟我聊天", bTalk:"對我說話", soon:"Phase 2",
+      greet:["嗨～我是小恐龍！<span class='sub'>想跟我玩什麼呢？</span>",
+             "哈囉小朋友！<span class='sub'>今天想知道什麼呀？</span>",
+             "耶！你來找我玩了～<span class='sub'>點我聊天吧！</span>"],
+      stamp:"初步原型 · 你的原創角色，目前用截圖裁切版；正式上線建議換成去背高解析原檔"
+    },
+    en:{
+      venue:"Little Dino Land",
+      hint:"Tap me!",
+      bChat:"Chat with me", bTalk:"Talk to me", soon:"Phase 2",
+      greet:["Hi! I'm Dino!<span class='sub'>What do you want to do?</span>",
+             "Hello little friend!<span class='sub'>What would you like to know?</span>",
+             "Yay, you found me!<span class='sub'>Tap to chat!</span>"],
+      stamp:"Preliminary prototype · your original character (cropped from screenshot) — swap in a clean hi-res transparent PNG for launch"
+    }
+  };
+  const EXPR = ["character/portrait/idle.png",
+                "character/expressions/happy.png",
+                "character/expressions/talking.png",
+                "character/expressions/thinking.png"];
+  let lang="zh", gi=0, ei=0;
+
+  function render(){
+    const t=T[lang];
+    venue.textContent=t.venue; hint.textContent=t.hint;
+    document.getElementById('b-chat').textContent=t.bChat;
+    document.getElementById('b-talk').textContent=t.bTalk;
+    soon.textContent=t.soon; stamp.textContent=t.stamp;
+    bubble.innerHTML=t.greet[gi % t.greet.length];
+    document.documentElement.lang = lang==="zh" ? "zh-Hant":"en";
+  }
+  function setLang(l){
+    lang=l; zh.classList.toggle('on',l==="zh"); en.classList.toggle('on',l==="en"); render();
+  }
+  // 點小恐龍：切表情 + 換一句招呼（示範表情由互動驅動）
+  function poke(){
+    ei=(ei+1)%EXPR.length; gi++;
+    dragon.src=EXPR[ei];
+    render();
+  }
+  // 待機時每 4 秒輕輕換句招呼，吸引小朋友 (attract)
+  setInterval(()=>{ if(ei===0){ gi++; render(); } }, 4000);
+  render();
+</script>
+</body>
+</html>

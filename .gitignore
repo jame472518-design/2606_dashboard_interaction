@@ -1,0 +1,24 @@
+# Claude Code 本機設定（個人，不入版控）
+.claude/
+
+# 相依套件 / 建置產物
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 向量索引等可重建的 build 產物
+tenants/*/index/
+PORJECT/*/index/
+
+# 模型權重（太大，不入版控）
+*.gguf
+*.bin
+
+# 作業系統 / 編輯器雜物
+Thumbs.db
+.DS_Store
+*.log
+.vscode/
+.idea/
