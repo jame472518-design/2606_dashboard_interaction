@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小恐龍 Road 2 輕量 rig · 即時眨眼+對嘴</title>
+<style>
+  :root{ --green:#7CB36A; --green-dark:#4f8a45; --cream:#FBF3E2; --peach:#F7B7A8; --ink:#3b4a36; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{font-family:"Baloo 2","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;color:var(--ink);
+    background:radial-gradient(120% 80% at 50% 0%, #fffaf0 0%, var(--cream) 55%, #efe2c6 100%);user-select:none}
+  #rig{position:fixed;inset:0;z-index:1}
+  .stage{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;pointer-events:none}
+  .stage button,.stage .lang{pointer-events:auto}
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:22px 30px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.15rem;color:var(--green-dark)}
+  .logo .dot{width:34px;height:34px;border-radius:50%;background:var(--green);display:grid;place-items:center;
+    color:#fff;font-size:1.1rem;box-shadow:0 4px 0 #4f8a45}
+  .lang{display:flex;background:#fff;border-radius:999px;padding:4px;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+  .lang button{border:0;background:transparent;font-weight:800;font-size:.95rem;color:#9aa898;padding:7px 16px;border-radius:999px;cursor:pointer}
+  .lang button.on{background:var(--green);color:#fff}
+  .bubble{align-self:center;margin-top:6px;background:#fff;border-radius:26px;padding:14px 26px;max-width:560px;
+    text-align:center;font-size:1.5rem;font-weight:800;color:var(--green-dark);box-shadow:0 10px 30px rgba(0,0,0,.10)}
+  .spacer{flex:1}
+  .actions{display:flex;gap:18px;justify-content:center;padding:0 0 40px;flex-wrap:wrap}
+  .btn{display:flex;align-items:center;gap:10px;border:0;cursor:pointer;font-family:inherit;font-weight:800;
+    font-size:1.2rem;color:#fff;padding:16px 30px;border-radius:22px}
+  .btn:active{transform:translateY(3px)}
+  .btn-talk{background:var(--green);box-shadow:0 6px 0 #4f8a45}
+  .btn-blink{background:#7cc0c8;box-shadow:0 6px 0 #4f8e96}
+  .badge{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:3;background:#4f8a45;color:#fff;
+    font-size:.72rem;font-weight:800;padding:5px 14px;border-radius:999px;opacity:.9}
+  .status{position:fixed;top:42px;left:50%;transform:translateX(-50%);z-index:3;font-size:.72rem;font-weight:700;
+    padding:4px 12px;border-radius:999px}
+  .status.placeholder{background:#ffe6a8;color:#7a5a00}
+  .status.real{background:#bfe3b0;color:#2f5a23}
+  .stamp{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:3;font-size:.72rem;color:#b3a98f;font-weight:700;text-align:center}
+</style>
+</head>
+<body>
+  <canvas id="rig"></canvas>
+  <div class="badge">⚡ Road 2 輕量 rig：即時合成圖層 · 自動眨眼 · 對嘴 · 呼吸 · 觸控視差</div>
+  <div class="status placeholder" id="status">占位模式：程式生成的小恐龍（放入 character/rig/*.png 後自動換成你的素材）</div>
+
+  <div class="stage">
+    <div class="topbar">
+      <div class="logo"><span class="dot">🦕</span><span id="venue">小恐龍樂園</span></div>
+      <div class="lang">
+        <button id="zh" class="on" onclick="setLang('zh')">中文</button>
+        <button id="en" onclick="setLang('en')">EN</button>
+      </div>
+    </div>
+    <div class="bubble" id="bubble">嗨～我會眨眼，按按鈕看我講話！</div>
+    <div class="spacer"></div>
+    <div class="actions">
+      <button class="btn btn-talk" onclick="talk()"><span>🗣️</span><span id="b-talk">講話（對嘴）</span></button>
+      <button class="btn btn-blink" onclick="blinkNow()"><span>😉</span><span id="b-blink">眨一下</span></button>
+    </div>
+  </div>
+  <div class="stamp" id="stamp">輕量 rig · 眨眼/對嘴皆即時運算；Phase 2 對嘴改由 TTS 音量驅動</div>
+
+<script>
+  const $=id=>document.getElementById(id);
+  const T={
+    zh:{venue:"小恐龍樂園",greet:"嗨～我會眨眼，按按鈕看我講話！",talkMsg:"哈囉！這是即時對嘴～",bTalk:"講話（對嘴）",bBlink:"眨一下",
+        stamp:"輕量 rig · 眨眼/對嘴皆即時運算；Phase 2 對嘴改由 TTS 音量驅動",
+        sPlace:"占位模式：程式生成的小恐龍（放入 character/rig/*.png 後自動換成你的素材）",
+        sReal:"已載入你的素材圖層 ✓"},
+    en:{venue:"Little Dino Land",greet:"Hi! I blink — tap to see me talk!",talkMsg:"Hello! Real-time lip-sync~",bTalk:"Talk (lip-sync)",bBlink:"Blink",
+        stamp:"Lightweight rig · blink & lip-sync computed live; Phase 2 drives mouth from TTS",
+        sPlace:"Placeholder: procedurally drawn dino (drop character/rig/*.png to use your art)",
+        sReal:"Your layered art loaded ✓"}
+  };
+  let lang="zh";
+  function setLang(l){ lang=l; $('zh').classList.toggle('on',l==="zh"); $('en').classList.toggle('on',l==="en");
+    const t=T[l]; $('venue').textContent=t.venue; $('bubble').textContent=t.greet; $('b-talk').textContent=t.bTalk;
+    $('b-blink').textContent=t.bBlink; $('stamp').textContent=t.stamp;
+    $('status').textContent = hasReal? t.sReal : t.sPlace; document.documentElement.lang=l==="zh"?"zh-Hant":"en"; }
+
+  // ===== 載入圖層（缺檔則用程式占位） =====
+  const NAMES=["body","eyes_open","eyes_closed","mouth_closed","mouth_mid","mouth_open","cheeks","brows"];
+  const IMG={}; let pending=NAMES.length, hasReal=false;
+  NAMES.forEach(n=>{ const im=new Image(); im.onload=()=>{IMG[n]=im;done();}; im.onerror=()=>{done();};
+    im.src="character/rig/"+n+".png"; });
+  function done(){ if(--pending<=0){
+    hasReal = !!(IMG.body && IMG.eyes_open && IMG.eyes_closed && IMG.mouth_closed && IMG.mouth_open);
+    $('status').className = "status "+(hasReal?"real":"placeholder");
+    setLang(lang);
+  }}
+
+  // ===== Canvas =====
+  const cv=$('rig'), ctx=cv.getContext('2d');
+  function resize(){ cv.width=innerWidth; cv.height=innerHeight; } resize(); addEventListener('resize',resize);
+
+  // ===== 狀態：眨眼 / 對嘴 / 視差 =====
+  let blink=0;            // 0..1 閉合程度
+  let blinkPhase="idle", blinkT0=0, nextBlink=900;
+  let mouth=0;            // 0..1 嘴巴開合
+  let talkUntil=0;
+  let px=0,py=0,tx=0,ty=0; // 視差
+  addEventListener('mousemove',e=>{ tx=(e.clientX/innerWidth*2-1); ty=(e.clientY/innerHeight*2-1); });
+  addEventListener('touchmove',e=>{const t=e.touches[0]; tx=(t.clientX/innerWidth*2-1); ty=(t.clientY/innerHeight*2-1);},{passive:true});
+
+  function blinkNow(){ if(blinkPhase==="idle"){ blinkPhase="closing"; blinkT0=performance.now(); } }
+  function talk(){ talkUntil=performance.now()+2600; $('bubble').textContent=T[lang].talkMsg; }
+
+  function loop(now){
+    // --- 自動眨眼排程 ---
+    if(blinkPhase==="idle"){ nextBlink-=16; if(nextBlink<=0){ blinkNow(); } }
+    if(blinkPhase==="closing"){ const k=(now-blinkT0)/90; blink=Math.min(1,k); if(k>=1){blinkPhase="opening";blinkT0=now;} }
+    else if(blinkPhase==="opening"){ const k=(now-blinkT0)/130; blink=Math.max(0,1-k); if(k>=1){blinkPhase="idle";blink=0;nextBlink=2000+Math.random()*4000;} }
+    // --- 對嘴 ---
+    if(now<talkUntil){ const base=Math.abs(Math.sin(now/70)); mouth=base*(0.55+Math.random()*0.45); }
+    else mouth*=0.6;
+    // --- 視差平滑 ---
+    px+=(tx-px)*0.07; py+=(ty-py)*0.07;
+    // --- 呼吸/浮動 ---
+    const t=now/1000, breathe=1+Math.sin(t*1.8)*0.02, bob=Math.sin(t*1.2)*8;
+
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const cx=cv.width/2 + px*22, cy=cv.height*0.56 + bob + py*12;
+    const S=Math.min(cv.width,cv.height)*0.78;     // 角色基準尺寸
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(px*0.04); ctx.scale(breathe, 2-breathe);
+    if(hasReal) drawReal(S); else drawPlaceholder(S, now);
+    ctx.restore();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // ===== 用真素材合成（同畫布對齊，直接層層疊上） =====
+  function drawReal(S){
+    const im=IMG.body, ratio=im.width/im.height, w=S*ratio, h=S, x=-w/2, y=-h/2;
+    const blit=n=>{ if(IMG[n]) ctx.drawImage(IMG[n],x,y,w,h); };
+    blit("body");
+    // 眨眼：以閉合度在 open/closed 間交叉淡入
+    if(IMG.eyes_open){ ctx.globalAlpha=1-blink; ctx.drawImage(IMG.eyes_open,x,y,w,h); }
+    if(IMG.eyes_closed){ ctx.globalAlpha=blink; ctx.drawImage(IMG.eyes_closed,x,y,w,h); }
+    ctx.globalAlpha=1;
+    blit("cheeks"); blit("brows");
+    // 對嘴：依開合度選嘴型
+    const m = mouth<0.18? "mouth_closed" : mouth<0.55? (IMG.mouth_mid?"mouth_mid":"mouth_open") : "mouth_open";
+    blit(m);
+  }
+
+  // ===== 程式占位：暴龍外型 + 原圖萌系感覺（柔綠/奶油肚/大藍眼/腮紅） =====
+  function drawPlaceholder(S, now){
+    const u=S/100;
+    const GREEN="#86bd6a", DARK="#74ad5d", DEEP="#5f9a50", CREAM="#f5ecd6",
+          SPOT="#f1d99c", EYE="#33405a", CHEEK="rgba(244,162,152,.7)", LINE="#4f7a44";
+    const wag=Math.sin(now/600)*4*u;
+    // 長尾巴（粗、收尖、奶油色下緣、微擺）
+    ctx.fillStyle=DARK;
+    ctx.beginPath(); ctx.moveTo(24*u,24*u);
+    ctx.quadraticCurveTo(58*u,16*u+wag, 78*u,36*u+wag);
+    ctx.quadraticCurveTo(54*u,34*u, 24*u,42*u); ctx.closePath(); ctx.fill();
+    // 圓潤背突（毛絨感：小圓鼓包，不尖銳）
+    ctx.fillStyle=DEEP;
+    for(const [rx,ry,rr] of [[-24,-36,6],[-33,-20,7],[-39,-2,7],[-37,16,6]])
+      { ctx.beginPath(); ctx.arc(rx*u,ry*u,rr*u,0,7); ctx.fill(); }
+    // 粗壯短腳 + 奶油腳爪
+    ctx.fillStyle=DARK;
+    ctx.beginPath(); ctx.ellipse(-16*u,50*u,15*u,11*u,0,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(16*u,50*u,15*u,11*u,0,0,7); ctx.fill();
+    ctx.fillStyle=CREAM;
+    for(const fx of [-24,-17,-10, 10,17,24]){ ctx.beginPath(); ctx.ellipse(fx*u,57*u,2.4*u,3*u,0,0,7); ctx.fill(); }
+    // 圓胖身體 + 大頭（一體，毛絨圓潤）
+    ctx.fillStyle=GREEN;
+    ctx.beginPath(); ctx.ellipse(0,2*u,42*u,50*u,0,0,7); ctx.fill();
+    // 奶油色大肚子
+    ctx.fillStyle=CREAM;
+    ctx.beginPath(); ctx.ellipse(0,22*u,24*u,26*u,0,0,7); ctx.fill();
+    // 身上奶油斑點（萌系）
+    ctx.fillStyle=SPOT;
+    for(const [sx,sy,sr] of [[-30,-12,2.4],[-34,2,2],[30,-14,2.4],[34,4,2],[-22,-30,1.8],[24,-28,1.8]])
+      { ctx.beginPath(); ctx.arc(sx*u,sy*u,sr*u,0,7); ctx.fill(); }
+    // 暴龍招牌小短手（往上舉、奶油小爪）
+    ctx.strokeStyle=DARK; ctx.lineWidth=5.5*u; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(-20*u,10*u); ctx.lineTo(-29*u,4*u); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(20*u,10*u); ctx.lineTo(29*u,4*u); ctx.stroke();
+    ctx.fillStyle=CREAM;
+    ctx.beginPath(); ctx.arc(-30*u,3*u,2.2*u,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc(30*u,3*u,2.2*u,0,7); ctx.fill();
+    // 吻部鼻孔
+    ctx.fillStyle=LINE;
+    ctx.beginPath(); ctx.ellipse(-5*u,-12*u,1.6*u,1.2*u,0,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(5*u,-12*u,1.6*u,1.2*u,0,0,7); ctx.fill();
+    // 粉嫩腮紅
+    ctx.fillStyle=CHEEK;
+    ctx.beginPath(); ctx.ellipse(-26*u,-4*u,8*u,5*u,0,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(26*u,-4*u,8*u,5*u,0,0,7); ctx.fill();
+    // 大大圓藍眼（原圖招牌）
+    const eo=1-blink;
+    drawEye(-14*u,-26*u, u, eo, EYE);
+    drawEye( 14*u,-26*u, u, eo, EYE);
+    // 嘴：閉=甜笑、開=可愛小圓牙（依 mouth 開合）
+    drawMouth(0,-6*u,u,mouth);
+  }
+  function drawEye(ex,ey,u,open,EYE){
+    if(open>0.15){
+      ctx.fillStyle="#fff"; ctx.beginPath(); ctx.ellipse(ex,ey,9*u,11*u*open,0,0,7); ctx.fill();      // 大眼白
+      ctx.fillStyle=EYE;   ctx.beginPath(); ctx.ellipse(ex+0.5*u,ey+1*u,6*u,8*u*open,0,0,7); ctx.fill(); // 藍眼珠
+      ctx.fillStyle="#fff"; ctx.beginPath(); ctx.ellipse(ex-2.5*u,ey-3*u*open,3*u,3*u*open,0,0,7); ctx.fill(); // 大反光
+      ctx.beginPath(); ctx.ellipse(ex+2.5*u,ey+3*u*open,1.4*u,1.4*u*open,0,0,7); ctx.fill();              // 小反光
+    }else{
+      ctx.strokeStyle=EYE; ctx.lineWidth=2.8*u; ctx.lineCap="round";
+      ctx.beginPath(); ctx.arc(ex,ey,8*u,0.12*Math.PI,0.88*Math.PI); ctx.stroke(); // 開心閉眼弧
+    }
+  }
+  function drawMouth(mx,my,u,open){
+    const w=17*u;
+    if(open<0.18){
+      // 閉嘴：甜甜微笑 + 兩顆小圓牙
+      ctx.strokeStyle="#5a2f2f"; ctx.lineWidth=2.6*u; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(mx-w,my); ctx.quadraticCurveTo(mx,my+8*u,mx+w,my); ctx.stroke();
+      ctx.fillStyle="#fff";
+      ctx.beginPath(); ctx.moveTo(mx-5*u,my+2*u); ctx.lineTo(mx-1.5*u,my+2*u); ctx.lineTo(mx-3.2*u,my+5.5*u); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(mx+1.5*u,my+2*u); ctx.lineTo(mx+5*u,my+2*u); ctx.lineTo(mx+3.2*u,my+5.5*u); ctx.closePath(); ctx.fill();
+    }else{
+      const h=open*16*u;
+      // 圓潤口腔
+      ctx.fillStyle="#8a4444";
+      ctx.beginPath();
+      ctx.moveTo(mx-w,my-1*u);
+      ctx.quadraticCurveTo(mx,my-6*u, mx+w,my-1*u);
+      ctx.quadraticCurveTo(mx+w,my+h, mx,my+h+3*u);
+      ctx.quadraticCurveTo(mx-w,my+h, mx-w,my-1*u);
+      ctx.closePath(); ctx.fill();
+      // 舌頭
+      ctx.fillStyle="#ef9a9a";
+      ctx.beginPath(); ctx.ellipse(mx,my+h*0.65,w*0.55,h*0.42+2*u,0,0,7); ctx.fill();
+      // 上排可愛小圓牙（小、不兇）
+      ctx.fillStyle="#fff";
+      for(let i=-2;i<=2;i++){ const tx=mx+i*6.5*u; ctx.beginPath();
+        ctx.moveTo(tx-2*u,my-2*u); ctx.lineTo(tx+2*u,my-2*u); ctx.lineTo(tx,my+1.5*u); ctx.closePath(); ctx.fill(); }
+      // 下排小圓牙
+      for(let i=-1;i<=1;i++){ const tx=mx+i*7*u; ctx.beginPath();
+        ctx.moveTo(tx-1.8*u,my+h); ctx.lineTo(tx+1.8*u,my+h); ctx.lineTo(tx,my+h-3.5*u); ctx.closePath(); ctx.fill(); }
+    }
+  }
+
+  setLang("zh");
+</script>
+</body>
+</html>

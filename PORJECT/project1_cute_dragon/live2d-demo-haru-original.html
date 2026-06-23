@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live2D 即時渲染 demo · 小恐龍 IP（範例模型）</title>
+<style>
+  :root{ --green:#7CB36A; --green-dark:#4f8a45; --cream:#FBF3E2; --peach:#F7B7A8; --ink:#3b4a36; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{font-family:"Baloo 2","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;color:var(--ink);
+    background:radial-gradient(120% 80% at 50% 0%, #fffaf0 0%, var(--cream) 55%, #efe2c6 100%);user-select:none}
+  #live2d{position:fixed;inset:0;z-index:1}
+  .stage{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;pointer-events:none}
+  .stage button,.stage .lang{pointer-events:auto}
+
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:22px 30px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.15rem;color:var(--green-dark)}
+  .logo .dot{width:34px;height:34px;border-radius:50%;background:var(--green);display:grid;place-items:center;
+    color:#fff;font-size:1.1rem;box-shadow:0 4px 0 #4f8a45}
+  .lang{display:flex;background:#fff;border-radius:999px;padding:4px;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+  .lang button{border:0;background:transparent;font-weight:800;font-size:.95rem;color:#9aa898;padding:7px 16px;
+    border-radius:999px;cursor:pointer}
+  .lang button.on{background:var(--green);color:#fff}
+
+  .bubble{align-self:center;margin-top:6px;background:#fff;border-radius:26px;padding:14px 26px;max-width:560px;
+    text-align:center;font-size:1.5rem;font-weight:800;color:var(--green-dark);box-shadow:0 10px 30px rgba(0,0,0,.10)}
+
+  .spacer{flex:1}
+  .actions{display:flex;gap:18px;justify-content:center;padding:0 0 40px;flex-wrap:wrap}
+  .btn{display:flex;align-items:center;gap:10px;border:0;cursor:pointer;font-family:inherit;font-weight:800;
+    font-size:1.2rem;color:#fff;padding:16px 30px;border-radius:22px}
+  .btn:active{transform:translateY(3px)}
+  .btn-talk{background:var(--green);box-shadow:0 6px 0 #4f8a45}
+  .btn-expr{background:#7cc0c8;box-shadow:0 6px 0 #4f8e96}
+  .btn-pose{background:#e6a157;box-shadow:0 6px 0 #c5823b}
+
+  .badge{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:3;background:#4f8a45;color:#fff;
+    font-size:.72rem;font-weight:800;padding:5px 14px;border-radius:999px;opacity:.9}
+  .stamp{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:3;font-size:.72rem;color:#b3a98f;
+    font-weight:700;text-align:center}
+  #err{position:fixed;inset:0;z-index:5;display:none;place-items:center;background:rgba(251,243,226,.96);
+    text-align:center;padding:40px;font-weight:700;color:#a35}
+</style>
+</head>
+<body>
+  <canvas id="live2d"></canvas>
+  <div class="badge">🟢 真 Live2D 即時渲染：呼吸 · 自動眨眼 · 看著滑鼠 · 待機動作 · 對嘴</div>
+
+  <div class="stage">
+    <div class="topbar">
+      <div class="logo"><span class="dot">🦕</span><span id="venue">小恐龍樂園</span></div>
+      <div class="lang">
+        <button id="zh" class="on" onclick="setLang('zh')">中文</button>
+        <button id="en" onclick="setLang('en')">EN</button>
+      </div>
+    </div>
+    <div class="bubble" id="bubble">嗨～我是即時渲染的角色！</div>
+    <div class="spacer"></div>
+    <div class="actions">
+      <button class="btn btn-talk" onclick="talk()"><span>🗣️</span><span id="b-talk">講話（對嘴）</span></button>
+      <button class="btn btn-expr" onclick="nextExpr()"><span>😊</span><span id="b-expr">換表情</span></button>
+      <button class="btn btn-pose" onclick="nextMotion()"><span>💃</span><span id="b-pose">做動作</span></button>
+    </div>
+  </div>
+
+  <div class="stamp" id="stamp">真 Live2D 即時渲染 · 目前為免費範例模型 (Haru)；rig 好小恐龍後換成自家角色</div>
+  <div id="err">⚠️ 載入失敗：請確認此電腦有網路（demo 需連網載入 Live2D 元件與範例模型）。<br>正式離線版會把所有資源放到本機。</div>
+
+  <!-- 載入順序：Cubism 核心 → PIXI → pixi-live2d-display -->
+  <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/cubism4.min.js"></script>
+  <script>
+    const MODEL_URL = "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json";
+    const T = {
+      zh:{ venue:"小恐龍樂園", greet:"嗨～我是即時渲染的角色！", bTalk:"講話（對嘴）", bExpr:"換表情", bPose:"做動作",
+           stamp:"真 Live2D 即時渲染 · 目前為免費範例模型 (Haru)；rig 好小恐龍後換成自家角色" },
+      en:{ venue:"Little Dino Land", greet:"Hi! I'm rendered in real time!", bTalk:"Talk (lip-sync)", bExpr:"Expression", bPose:"Motion",
+           stamp:"Real Live2D real-time render · sample model (Haru) for now; swap in the rigged dino later" }
+    };
+    let lang="zh";
+    const $=id=>document.getElementById(id);
+    function setLang(l){ lang=l; $('zh').classList.toggle('on',l==="zh"); $('en').classList.toggle('on',l==="en");
+      const t=T[l]; $('venue').textContent=t.venue; $('bubble').textContent=t.greet;
+      $('b-talk').textContent=t.bTalk; $('b-expr').textContent=t.bExpr; $('b-pose').textContent=t.bPose;
+      $('stamp').textContent=t.stamp; document.documentElement.lang=l==="zh"?"zh-Hant":"en"; }
+
+    let model=null, talking=0, exprIdx=0, motionIdx=0;
+    (async function(){
+      try{
+        if(!window.PIXI || !PIXI.live2d){ throw new Error("SDK not loaded"); }
+        PIXI.live2d.Live2DModel.registerTicker(PIXI.Ticker);
+        const app = new PIXI.Application({ view:$('live2d'), resizeTo:window, backgroundAlpha:0, antialias:true });
+        model = await PIXI.live2d.Live2DModel.from(MODEL_URL);   // 自動：呼吸/眨眼/看滑鼠/待機動作
+        app.stage.addChild(model);
+
+        function layout(){
+          const s = (Math.min(window.innerWidth, window.innerHeight)*0.9) / model.internalModel.height;
+          model.scale.set(s);
+          model.anchor.set(0.5, 0.5);
+          model.position.set(window.innerWidth/2, window.innerHeight*0.56);
+        }
+        layout(); window.addEventListener('resize', layout);
+
+        // 對嘴：在 model 更新後覆寫嘴巴開合參數（用音波近似；Phase 2 改由 TTS 音量驅動）
+        app.ticker.add(()=>{
+          if(talking>0 && model){
+            const v = Math.abs(Math.sin(performance.now()/70)) * (0.4+Math.random()*0.6);
+            try{ model.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', v); }catch(e){}
+          }
+        });
+      }catch(e){ console.error(e); $('err').style.display='grid'; }
+    })();
+
+    function talk(){ talking=1; $('bubble').textContent = lang==="zh"?"哈囉！這是即時對嘴示範～":"Hello! Real-time lip-sync demo~";
+      clearTimeout(window._t); window._t=setTimeout(()=>{ talking=0;
+        try{ model.internalModel.coreModel.setParameterValueById('ParamMouthOpenY',0); }catch(e){} }, 2600); }
+    function nextExpr(){ if(!model) return; try{ model.expression(); }catch(e){} }   // 隨機表情（若模型有）
+    function nextMotion(){ if(!model) return; try{ model.motion('Tap'); }catch(e){ try{ model.motion('Idle'); }catch(_){} } }
+
+    setLang('zh');
+  </script>
+</body>
+</html>

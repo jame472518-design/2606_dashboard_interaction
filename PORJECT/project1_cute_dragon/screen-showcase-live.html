@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小恐龍互動 IP · 即時動態渲染版 (Phase 1 · 狀態 A)</title>
+<style>
+  :root{ --green:#7CB36A; --green-dark:#4f8a45; --cream:#FBF3E2; --peach:#F7B7A8; --ink:#3b4a36; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{font-family:"Baloo 2","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;color:var(--ink);
+    background:radial-gradient(120% 80% at 50% 0%, #fffaf0 0%, var(--cream) 55%, #efe2c6 100%);
+    user-select:none;cursor:default}
+  /* 即時粒子層 */
+  #fx{position:fixed;inset:0;z-index:0;pointer-events:none}
+  .stage{position:relative;z-index:1;height:100%;display:flex;flex-direction:column}
+
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:22px 30px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.15rem;color:var(--green-dark)}
+  .logo .dot{width:34px;height:34px;border-radius:50%;background:var(--green);display:grid;place-items:center;
+    color:#fff;font-size:1.1rem;box-shadow:0 4px 0 #4f8a45}
+  .lang{display:flex;background:#fff;border-radius:999px;padding:4px;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+  .lang button{border:0;background:transparent;font-weight:800;font-size:.95rem;color:#9aa898;padding:7px 16px;
+    border-radius:999px;cursor:pointer;transition:.2s}
+  .lang button.on{background:var(--green);color:#fff}
+
+  .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  .bubble{position:relative;background:#fff;border-radius:26px;padding:18px 28px;max-width:560px;text-align:center;
+    font-size:1.7rem;font-weight:800;color:var(--green-dark);line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.10);
+    transition:transform .25s}
+  .bubble::after{content:"";position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);
+    border:14px solid transparent;border-top-color:#fff;border-bottom:0}
+  .bubble .sub{display:block;font-size:1.05rem;font-weight:700;color:#9aa898;margin-top:4px}
+
+  /* 形象舞台：JS 即時驅動 transform */
+  .scene{position:relative;width:min(48vh,440px);height:min(48vh,440px);display:grid;place-items:center}
+  .shadow{position:absolute;bottom:6%;width:55%;height:7%;border-radius:50%;
+    background:radial-gradient(50% 50%, rgba(70,100,50,.35), transparent 70%);filter:blur(2px)}
+  .dragon{width:100%;height:auto;display:block;will-change:transform;
+    filter:drop-shadow(0 14px 18px rgba(80,120,60,.28));cursor:pointer;border-radius:30px}
+  .tap-hint{position:absolute;right:4%;top:8%;background:var(--peach);color:#fff;font-weight:800;font-size:.8rem;
+    padding:6px 12px;border-radius:999px;box-shadow:0 4px 0 #e09384;pointer-events:none}
+
+  .actions{display:flex;gap:22px;justify-content:center;padding:0 0 30px}
+  .btn{display:flex;align-items:center;gap:12px;border:0;cursor:pointer;font-family:inherit;font-weight:800;
+    font-size:1.45rem;color:#fff;padding:20px 40px;border-radius:26px;transition:transform .12s}
+  .btn:active{transform:translateY(3px)}
+  .btn .ic{font-size:1.6rem}
+  .btn-chat{background:var(--green);box-shadow:0 6px 0 #4f8a45}
+  .btn-talk{background:#7cc0c8;box-shadow:0 6px 0 #4f8e96;position:relative}
+  .btn-talk .soon{position:absolute;top:-12px;right:-10px;background:#ffb24a;color:#5a3a00;font-size:.7rem;
+    padding:3px 9px;border-radius:999px;box-shadow:0 3px 0 #d98e2e}
+
+  .badge{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:3;background:#4f8a45;color:#fff;
+    font-size:.72rem;font-weight:800;padding:5px 14px;border-radius:999px;opacity:.85}
+  .stamp{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:2;font-size:.72rem;color:#b3a98f;
+    font-weight:700;text-align:center}
+</style>
+</head>
+<body>
+  <canvas id="fx"></canvas>
+  <div class="badge">⚡ 即時運算渲染（非換圖）：呼吸 · 晃動 · squash · 粒子 · 觸控視差</div>
+
+  <div class="stage">
+    <div class="topbar">
+      <div class="logo"><span class="dot">🦕</span><span id="venue">小恐龍樂園</span></div>
+      <div class="lang">
+        <button id="zh" class="on" onclick="setLang('zh')">中文</button>
+        <button id="en" onclick="setLang('en')">EN</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="bubble" id="bubble"></div>
+      <div class="scene" id="scene">
+        <div class="shadow" id="shadow"></div>
+        <img class="dragon" id="dragon" src="character/portrait/idle.png" alt="小恐龍" onclick="poke()">
+        <span class="tap-hint" id="hint">點我！</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-chat" onclick="poke()"><span class="ic">⌨️</span><span id="b-chat">跟我聊天</span></button>
+      <button class="btn btn-talk" onclick="poke()"><span class="ic">🎤</span><span id="b-talk">對我說話</span>
+        <span class="soon" id="soon">Phase 2</span></button>
+    </div>
+  </div>
+
+  <div class="stamp" id="stamp">即時動態渲染版 · 平面圖即時運算；眨眼/對嘴需分層素材 → Live2D (Phase 3)</div>
+
+<script>
+  // ================== 文案（雙語） ==================
+  const T = {
+    zh:{ venue:"小恐龍樂園", hint:"點我！", bChat:"跟我聊天", bTalk:"對我說話", soon:"Phase 2",
+      greet:["嗨～我是小恐龍！<span class='sub'>想跟我玩什麼呢？</span>",
+             "哈囉小朋友！<span class='sub'>今天想知道什麼呀？</span>",
+             "耶！你來找我玩了～<span class='sub'>點我聊天吧！</span>"],
+      stamp:"即時動態渲染版 · 平面圖即時運算；眨眼/對嘴需分層素材 → Live2D (Phase 3)" },
+    en:{ venue:"Little Dino Land", hint:"Tap me!", bChat:"Chat with me", bTalk:"Talk to me", soon:"Phase 2",
+      greet:["Hi! I'm Dino!<span class='sub'>What do you want to do?</span>",
+             "Hello little friend!<span class='sub'>What would you like to know?</span>",
+             "Yay, you found me!<span class='sub'>Tap to chat!</span>"],
+      stamp:"Live render demo · real-time on flat art; blink/lip-sync needs layered art → Live2D (Phase 3)" }
+  };
+  const EXPR = ["character/portrait/idle.png","character/expressions/happy.png",
+                "character/expressions/talking.png","character/expressions/thinking.png"];
+  let lang="zh", gi=0, ei=0;
+  const $=id=>document.getElementById(id);
+
+  function render(){
+    const t=T[lang];
+    $('venue').textContent=t.venue; $('hint').textContent=t.hint;
+    $('b-chat').textContent=t.bChat; $('b-talk').textContent=t.bTalk;
+    $('soon').textContent=t.soon; $('stamp').textContent=t.stamp;
+    $('bubble').innerHTML=t.greet[gi % t.greet.length];
+    document.documentElement.lang = lang==="zh"?"zh-Hant":"en";
+  }
+  function setLang(l){ lang=l; $('zh').classList.toggle('on',l==="zh"); $('en').classList.toggle('on',l==="en"); render(); }
+
+  // ================== 即時動態：呼吸 / 晃動 / squash / 觸控視差 ==================
+  const dragon=$('dragon'), shadow=$('shadow');
+  let pointer={x:0,y:0,active:0};        // 標準化 -1..1
+  let squash=0;                          // 點擊時的彈跳能量
+  function onMove(e){
+    const t=e.touches?e.touches[0]:e, r=document.body.getBoundingClientRect();
+    pointer.x=((t.clientX/r.width)*2-1); pointer.y=((t.clientY/r.height)*2-1); pointer.active=1;
+  }
+  window.addEventListener('mousemove',onMove);
+  window.addEventListener('touchmove',onMove,{passive:true});
+  window.addEventListener('mouseleave',()=>pointer.active=0);
+
+  // 平滑追蹤的傾斜值
+  let tiltX=0,tiltY=0;
+  function frame(now){
+    const t=now/1000;
+    // 待機呼吸 + 上下浮動（多個正弦疊加）
+    const breathe = 1 + Math.sin(t*1.8)*0.018;        // 縱向呼吸
+    const bob     = Math.sin(t*1.25)*10;              // 上下
+    const swayRot = Math.sin(t*0.9)*2.2;              // 左右擺
+    // 觸控視差：龍朝指標方向傾、平移；陰影反向
+    const tx = (pointer.active?pointer.x:0)*14;
+    const ty = (pointer.active?pointer.y:0)*8;
+    tiltX += ((pointer.active?pointer.x:0)*6 - tiltX)*0.08;
+    tiltY += ((pointer.active?pointer.y:0)*4 - tiltY)*0.08;
+    // 點擊彈跳：squash → stretch 回彈
+    squash *= 0.88;
+    const sx = breathe*(1 + squash*0.18);
+    const sy = (2-breathe)*(1 - squash*0.22);
+
+    dragon.style.transform =
+      `translate(${tx}px, ${bob+ty}px) rotate(${swayRot+tiltX*0.4}deg) scale(${sx}, ${sy})`;
+    // 陰影隨浮動縮放、反向位移，營造高度感
+    const lift=(bob+12)/24;
+    shadow.style.transform = `translateX(${-tx*0.6}px) scale(${1.05-lift*0.18})`;
+    shadow.style.opacity = 0.5 - lift*0.12;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ================== 點擊互動：彈跳 + 粒子爆發 + 換表情 ==================
+  function poke(){
+    ei=(ei+1)%EXPR.length; gi++; dragon.src=EXPR[ei]; render();
+    squash=1; burst(28);
+    $('bubble').style.transform='scale(1.06)'; setTimeout(()=>$('bubble').style.transform='',220);
+  }
+
+  // ================== Canvas 粒子（即時繪製，非圖片） ==================
+  const cv=$('fx'), cx=cv.getContext('2d');
+  let P=[]; function resize(){ cv.width=innerWidth; cv.height=innerHeight; } resize(); addEventListener('resize',resize);
+  const COL=['#ffd98a','#bfe3b0','#fcd5c8','#cdeef0','#ffffff'];
+  function spawn(x,y,burst){
+    P.push({x,y,vx:(Math.random()-0.5)*(burst?5:0.5),vy:burst?-(Math.random()*5+2):-(Math.random()*0.7+0.3),
+      r:Math.random()*7+3,life:1,col:COL[(Math.random()*COL.length)|0],rot:Math.random()*6});
+  }
+  function burst(n){ const r=$('scene').getBoundingClientRect(); const x=r.left+r.width/2,y=r.top+r.height/2;
+    for(let i=0;i<n;i++) spawn(x,y,true); }
+  // 背景持續輕飄的粒子
+  setInterval(()=>{ if(P.length<70) spawn(Math.random()*cv.width, cv.height+10,false); },180);
+  function draw(){
+    cx.clearRect(0,0,cv.width,cv.height);
+    for(const p of P){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.02; p.life-=0.006; p.rot+=0.04;
+      cx.globalAlpha=Math.max(0,p.life); cx.fillStyle=p.col;
+      cx.beginPath(); cx.arc(p.x,p.y,p.r*p.life,0,7); cx.fill(); }
+    P=P.filter(p=>p.life>0 && p.y>-20);
+    cx.globalAlpha=1; requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  // 待機每 4 秒換句招呼（attract）
+  setInterval(()=>{ if(ei===0){ gi++; render(); } },4000);
+  render();
+</script>
+</body>
+</html>
