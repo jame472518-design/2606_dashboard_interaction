@@ -29,11 +29,15 @@ async function readBody(req) {
 }
 
 async function serveStatic(res, urlPath) {
-  let rel = decodeURIComponent(urlPath.split('?')[0]);
+  // urlPath 是 url.pathname（URL 類別已解碼、不含 query），不要再 decode（避免雙重解碼）
+  let rel = urlPath;
   if (rel === '/') rel = '/web/home/index.html';
   if (rel.startsWith('/chat')) rel = '/web/chat/index.html';
   const full = path.normalize(path.join(REPO, rel));
-  if (!full.startsWith(path.join(REPO, 'web')) && !full.startsWith(path.join(REPO, 'tenants'))) {
+  // 前綴需加 path.sep，否則 web-evil / tenants-backup 之類同名兄弟目錄會繞過
+  const webRoot = path.join(REPO, 'web') + path.sep;
+  const tenantsRoot = path.join(REPO, 'tenants') + path.sep;
+  if (!full.startsWith(webRoot) && !full.startsWith(tenantsRoot)) {
     return send(res, 403, { error: 'forbidden' });
   }
   try {
