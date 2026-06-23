@@ -1,0 +1,5 @@
+mode: hub
+llm: { provider: ollama, model: base-model, base_url: 'http://localhost:11434' }
+embedding: { model: nomic-embed-text }
+server: { port: 8080, default_lang: zh-TW }
+retrieval: { top_k: 4, min_score: 0.35 }

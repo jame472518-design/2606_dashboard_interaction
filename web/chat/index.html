@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>對話</title>
+<style>
+:root{--green:#7CB36A;--green-dark:#4f8a45;--cream:#FBF3E2}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;color:#3b4a36;
+background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6);display:flex;flex-direction:column;height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;padding:16px 22px}
+.lang button{border:0;background:#fff;font-weight:800;padding:7px 14px;border-radius:999px;cursor:pointer;margin-left:6px}
+.lang button.on{background:var(--green);color:#fff}
+.char{flex:1;display:grid;place-items:center}.char img{max-height:42vh}
+#log{max-height:34vh;overflow:auto;padding:0 22px;display:flex;flex-direction:column;gap:8px}
+.msg{padding:10px 14px;border-radius:14px;max-width:72%;font-size:1.05rem}
+.me{align-self:flex-end;background:var(--green);color:#fff}.bot{align-self:flex-start;background:#fff}
+.bar{display:flex;gap:8px;padding:14px 22px}.bar input{flex:1;padding:14px;border:2px solid #d8c9a6;border-radius:14px;font-size:1.05rem}
+.bar button{border:0;background:var(--green);color:#fff;font-weight:800;padding:0 22px;border-radius:14px;cursor:pointer}
+.quick{display:flex;gap:8px;flex-wrap:wrap;padding:0 22px 6px}.quick button{border:0;background:#fff;border-radius:999px;padding:8px 14px;cursor:pointer;font-weight:700}
+</style></head>
+<body>
+<div class="top"><b id="title"></b><div class="lang"><button id="zh" class="on">中文</button><button id="en">EN</button></div></div>
+<div class="char"><img id="portrait" alt="" onerror="this.style.display='none'"></div>
+<div id="log"></div>
+<div class="quick" id="quick"></div>
+<div class="bar"><input id="inp" placeholder="點我打字…"><button id="send">送出</button></div>
+<script>
+const tenant=new URLSearchParams(location.search).get('tenant');
+let lang='zh-TW', history=[];
+const $=id=>document.getElementById(id);
+$('portrait').src = `/tenants/${tenant}/character/portrait/idle.png`;
+$('title').textContent = tenant || '';
+const QUICK={ 'zh-TW':['營業時間','票價','推薦動線'], 'en':['Hours','Tickets','Suggested route'] };
+function renderQuick(){ $('quick').innerHTML = QUICK[lang].map(q=>`<button>${q}</button>`).join('');
+  [...$('quick').children].forEach(b=>b.onclick=()=>{ $('inp').value=b.textContent; sendMsg(); }); }
+function setLang(l){ lang=l; $('zh').classList.toggle('on',l==='zh-TW'); $('en').classList.toggle('on',l==='en');
+  $('inp').placeholder = l==='en'?'Tap to type…':'點我打字…'; renderQuick(); }
+$('zh').onclick=()=>setLang('zh-TW'); $('en').onclick=()=>setLang('en');
+function add(role,text){ const d=document.createElement('div'); d.className='msg '+(role==='user'?'me':'bot');
+  d.textContent=text; $('log').appendChild(d); $('log').scrollTop=$('log').scrollHeight; }
+async function sendMsg(){ const text=$('inp').value.trim(); if(!text) return; $('inp').value='';
+  add('user',text);
+  // 送出時 history 只含「先前」對話；當前訊息由 message 帶、server 端再附加，避免重複
+  let res;
+  try {
+    res=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({tenant,message:text,history,lang})}).then(r=>r.json());
+  } catch(e){ add('assistant', lang==='en'?'(network error)':'（連線出錯了）'); return; }
+  history.push({role:'user',content:text});
+  add('assistant',res.reply); history.push({role:'assistant',content:res.reply}); }
+$('send').onclick=sendMsg; $('inp').addEventListener('keydown',e=>{ if(e.key==='Enter') sendMsg(); });
+setLang('zh-TW');
+</script></body></html>

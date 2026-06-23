@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>互動 IP 平台</title>
+<style>body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#FBF3E2;color:#3b4a36;
+text-align:center;padding:8vh 20px}h1{color:#4f8a45}.grid{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+a.card{display:block;background:#fff;border-radius:18px;padding:26px 34px;text-decoration:none;color:#3b4a36;
+font-weight:800;font-size:1.3rem;box-shadow:0 8px 22px rgba(0,0,0,.08)}</style></head>
+<body><h1>互動 IP 平台</h1><p>選擇一個角色開始</p><div class="grid" id="grid">載入中…</div>
+<script>
+fetch('/api/tenants').then(r=>r.json()).then(d=>{
+  if(d.mode==='single' && d.active_tenant){ location.href='/chat?tenant='+encodeURIComponent(d.active_tenant); return; }
+  document.getElementById('grid').innerHTML = d.tenants.map(t=>
+    `<a class="card" href="/chat?tenant=${encodeURIComponent(t.name)}">${t.display_name}</a>`).join('') || '尚無租戶';
+});
+</script></body></html>
