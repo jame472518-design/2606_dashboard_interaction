@@ -2,50 +2,187 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>對話</title>
 <style>
 :root{--green:#7CB36A;--green-dark:#4f8a45;--cream:#FBF3E2}
-*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%;overflow:hidden}
 body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;color:#3b4a36;
-background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6);display:flex;flex-direction:column;height:100vh}
+background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6)}
+#rig{position:fixed;inset:0;z-index:1}
+.ui{position:relative;z-index:2;height:100vh;display:flex;flex-direction:column;pointer-events:none}
+.ui button,.ui input{pointer-events:auto}
 .top{display:flex;justify-content:space-between;align-items:center;padding:16px 22px}
-.lang button{border:0;background:#fff;font-weight:800;padding:7px 14px;border-radius:999px;cursor:pointer;margin-left:6px}
+.top b{font-size:1.15rem;color:var(--green-dark)}
+.lang button{border:0;background:#fff;font-weight:800;padding:7px 14px;border-radius:999px;cursor:pointer;margin-left:6px;box-shadow:0 3px 10px rgba(0,0,0,.06)}
 .lang button.on{background:var(--green);color:#fff}
-.char{flex:1;display:grid;place-items:center}.char img{max-height:42vh}
-#log{max-height:34vh;overflow:auto;padding:0 22px;display:flex;flex-direction:column;gap:8px}
-.msg{padding:10px 14px;border-radius:14px;max-width:72%;font-size:1.05rem}
+.spacer{flex:1}
+#log{max-height:30vh;overflow:auto;padding:0 22px 6px;display:flex;flex-direction:column;gap:8px}
+.msg{padding:10px 14px;border-radius:14px;max-width:72%;font-size:1.05rem;box-shadow:0 3px 12px rgba(0,0,0,.07)}
 .me{align-self:flex-end;background:var(--green);color:#fff}.bot{align-self:flex-start;background:#fff}
-.bar{display:flex;gap:8px;padding:14px 22px}.bar input{flex:1;padding:14px;border:2px solid #d8c9a6;border-radius:14px;font-size:1.05rem}
+.quick{display:flex;gap:8px;flex-wrap:wrap;padding:0 22px 6px}
+.quick button{border:0;background:#fff;border-radius:999px;padding:8px 14px;cursor:pointer;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.06)}
+.bar{display:flex;gap:8px;padding:12px 22px 18px}
+.bar input{flex:1;padding:14px;border:2px solid #d8c9a6;border-radius:14px;font-size:1.05rem;background:#fff}
 .bar button{border:0;background:var(--green);color:#fff;font-weight:800;padding:0 22px;border-radius:14px;cursor:pointer}
-.quick{display:flex;gap:8px;flex-wrap:wrap;padding:0 22px 6px}.quick button{border:0;background:#fff;border-radius:999px;padding:8px 14px;cursor:pointer;font-weight:700}
 </style></head>
 <body>
-<div class="top"><b id="title"></b><div class="lang"><button id="zh" class="on">中文</button><button id="en">EN</button></div></div>
-<div class="char"><img id="portrait" alt="" onerror="this.style.display='none'"></div>
-<div id="log"></div>
-<div class="quick" id="quick"></div>
-<div class="bar"><input id="inp" placeholder="點我打字…"><button id="send">送出</button></div>
+<canvas id="rig"></canvas>
+<div class="ui">
+  <div class="top"><b id="title"></b><div class="lang"><button id="zh" class="on">中文</button><button id="en">EN</button></div></div>
+  <div class="spacer"></div>
+  <div id="log"></div>
+  <div class="quick" id="quick"></div>
+  <div class="bar"><input id="inp" placeholder="點我打字…"><button id="send">送出</button></div>
+</div>
 <script>
 const tenant=new URLSearchParams(location.search).get('tenant');
 let lang='zh-TW', history=[];
 const $=id=>document.getElementById(id);
-$('portrait').src = `/tenants/${tenant}/character/portrait/idle.png`;
 $('title').textContent = tenant || '';
 const QUICK={ 'zh-TW':['營業時間','票價','推薦動線'], 'en':['Hours','Tickets','Suggested route'] };
 function renderQuick(){ $('quick').innerHTML = QUICK[lang].map(q=>`<button>${q}</button>`).join('');
   [...$('quick').children].forEach(b=>b.onclick=()=>{ $('inp').value=b.textContent; sendMsg(); }); }
 function setLang(l){ lang=l; $('zh').classList.toggle('on',l==='zh-TW'); $('en').classList.toggle('on',l==='en');
-  $('inp').placeholder = l==='en'?'Tap to type…':'點我打字…'; renderQuick(); }
+  $('inp').placeholder = l==='en'?'Tap to type…':'點我打字…'; renderQuick();
+  document.documentElement.lang = l==='zh-TW'?'zh-Hant':'en'; }
 $('zh').onclick=()=>setLang('zh-TW'); $('en').onclick=()=>setLang('en');
 function add(role,text){ const d=document.createElement('div'); d.className='msg '+(role==='user'?'me':'bot');
   d.textContent=text; $('log').appendChild(d); $('log').scrollTop=$('log').scrollHeight; }
 async function sendMsg(){ const text=$('inp').value.trim(); if(!text) return; $('inp').value='';
   add('user',text);
-  // 送出時 history 只含「先前」對話；當前訊息由 message 帶、server 端再附加，避免重複
   let res;
   try {
     res=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({tenant,message:text,history,lang})}).then(r=>r.json());
   } catch(e){ add('assistant', lang==='en'?'(network error)':'（連線出錯了）'); return; }
   history.push({role:'user',content:text});
-  add('assistant',res.reply); history.push({role:'assistant',content:res.reply}); }
+  add('assistant',res.reply); history.push({role:'assistant',content:res.reply});
+  speak(res.reply);   // 收到回覆 → 觸發對嘴
+}
 $('send').onclick=sendMsg; $('inp').addEventListener('keydown',e=>{ if(e.key==='Enter') sendMsg(); });
+
+/* ===================== 即時 rig（會動的暴龍）===================== */
+/* 缺真素材時畫程式占位暴龍；放入 /tenants/<t>/character/rig/*.png 自動替換 */
+const NAMES=["body","eyes_open","eyes_closed","mouth_closed","mouth_mid","mouth_open","cheeks","brows"];
+const IMG={}; let pending=NAMES.length, hasReal=false;
+NAMES.forEach(n=>{ const im=new Image(); im.onload=()=>{IMG[n]=im;done();}; im.onerror=()=>{done();};
+  im.src=`/tenants/${tenant}/character/rig/${n}.png`; });
+function done(){ if(--pending<=0){ hasReal = !!(IMG.body && IMG.eyes_open && IMG.eyes_closed && IMG.mouth_closed && IMG.mouth_open); } }
+
+const cv=$('rig'), ctx=cv.getContext('2d');
+function resize(){ cv.width=innerWidth; cv.height=innerHeight; } resize(); addEventListener('resize',resize);
+let blink=0, blinkPhase="idle", blinkT0=0, nextBlink=900;
+let mouth=0, talkUntil=0;
+let px=0,py=0,tx=0,ty=0;
+addEventListener('mousemove',e=>{ tx=(e.clientX/innerWidth*2-1); ty=(e.clientY/innerHeight*2-1); });
+addEventListener('touchmove',e=>{const t=e.touches[0]; tx=(t.clientX/innerWidth*2-1); ty=(t.clientY/innerHeight*2-1);},{passive:true});
+function blinkNow(){ if(blinkPhase==="idle"){ blinkPhase="closing"; blinkT0=performance.now(); } }
+// 對嘴：時長依回覆長度估算（每字約 70ms，封頂 8 秒）
+function speak(textReply){ const ms=Math.min(8000, Math.max(1200,(textReply||'').length*70)); talkUntil=performance.now()+ms; }
+
+function loop(now){
+  if(blinkPhase==="idle"){ nextBlink-=16; if(nextBlink<=0){ blinkNow(); } }
+  if(blinkPhase==="closing"){ const k=(now-blinkT0)/90; blink=Math.min(1,k); if(k>=1){blinkPhase="opening";blinkT0=now;} }
+  else if(blinkPhase==="opening"){ const k=(now-blinkT0)/130; blink=Math.max(0,1-k); if(k>=1){blinkPhase="idle";blink=0;nextBlink=2000+Math.random()*4000;} }
+  if(now<talkUntil){ mouth=Math.abs(Math.sin(now/70))*(0.55+Math.random()*0.45); } else mouth*=0.6;
+  px+=(tx-px)*0.07; py+=(ty-py)*0.07;
+  const t=now/1000, breathe=1+Math.sin(t*1.8)*0.02, bob=Math.sin(t*1.2)*8;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const cx=cv.width/2 + px*20, cy=cv.height*0.40 + bob + py*10;   // 形象偏上，留下半部給對話
+  const S=Math.min(cv.width,cv.height)*0.52;
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(px*0.04); ctx.scale(breathe, 2-breathe);
+  if(hasReal) drawReal(S); else drawPlaceholder(S, now);
+  ctx.restore();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function drawReal(S){
+  const im=IMG.body, ratio=im.width/im.height, w=S*ratio, h=S, x=-w/2, y=-h/2;
+  const blit=n=>{ if(IMG[n]) ctx.drawImage(IMG[n],x,y,w,h); };
+  blit("body");
+  if(IMG.eyes_open){ ctx.globalAlpha=1-blink; ctx.drawImage(IMG.eyes_open,x,y,w,h); }
+  if(IMG.eyes_closed){ ctx.globalAlpha=blink; ctx.drawImage(IMG.eyes_closed,x,y,w,h); }
+  ctx.globalAlpha=1; blit("cheeks"); blit("brows");
+  const m = mouth<0.18? "mouth_closed" : mouth<0.55? (IMG.mouth_mid?"mouth_mid":"mouth_open") : "mouth_open";
+  blit(m);
+}
+
+/* 程式占位：暴龍外型 + 萌系感覺（柔綠/奶油肚/大藍眼/腮紅） */
+function drawPlaceholder(S, now){
+  const u=S/100;
+  const GREEN="#86bd6a", DARK="#74ad5d", DEEP="#5f9a50", CREAM="#f5ecd6",
+        SPOT="#f1d99c", EYE="#33405a", CHEEK="rgba(244,162,152,.7)", LINE="#4f7a44";
+  const wag=Math.sin(now/600)*4*u;
+  ctx.fillStyle=DARK;
+  ctx.beginPath(); ctx.moveTo(24*u,24*u);
+  ctx.quadraticCurveTo(58*u,16*u+wag, 78*u,36*u+wag);
+  ctx.quadraticCurveTo(54*u,34*u, 24*u,42*u); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=DEEP;
+  for(const [rx,ry,rr] of [[-24,-36,6],[-33,-20,7],[-39,-2,7],[-37,16,6]])
+    { ctx.beginPath(); ctx.arc(rx*u,ry*u,rr*u,0,7); ctx.fill(); }
+  ctx.fillStyle=DARK;
+  ctx.beginPath(); ctx.ellipse(-16*u,50*u,15*u,11*u,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(16*u,50*u,15*u,11*u,0,0,7); ctx.fill();
+  ctx.fillStyle=CREAM;
+  for(const fx of [-24,-17,-10, 10,17,24]){ ctx.beginPath(); ctx.ellipse(fx*u,57*u,2.4*u,3*u,0,0,7); ctx.fill(); }
+  ctx.fillStyle=GREEN;
+  ctx.beginPath(); ctx.ellipse(0,2*u,42*u,50*u,0,0,7); ctx.fill();
+  ctx.fillStyle=CREAM;
+  ctx.beginPath(); ctx.ellipse(0,22*u,24*u,26*u,0,0,7); ctx.fill();
+  ctx.fillStyle=SPOT;
+  for(const [sx,sy,sr] of [[-30,-12,2.4],[-34,2,2],[30,-14,2.4],[34,4,2],[-22,-30,1.8],[24,-28,1.8]])
+    { ctx.beginPath(); ctx.arc(sx*u,sy*u,sr*u,0,7); ctx.fill(); }
+  ctx.strokeStyle=DARK; ctx.lineWidth=5.5*u; ctx.lineCap="round";
+  ctx.beginPath(); ctx.moveTo(-20*u,10*u); ctx.lineTo(-29*u,4*u); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(20*u,10*u); ctx.lineTo(29*u,4*u); ctx.stroke();
+  ctx.fillStyle=CREAM;
+  ctx.beginPath(); ctx.arc(-30*u,3*u,2.2*u,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(30*u,3*u,2.2*u,0,7); ctx.fill();
+  ctx.fillStyle=LINE;
+  ctx.beginPath(); ctx.ellipse(-5*u,-12*u,1.6*u,1.2*u,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(5*u,-12*u,1.6*u,1.2*u,0,0,7); ctx.fill();
+  ctx.fillStyle=CHEEK;
+  ctx.beginPath(); ctx.ellipse(-26*u,-4*u,8*u,5*u,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(26*u,-4*u,8*u,5*u,0,0,7); ctx.fill();
+  const eo=1-blink;
+  drawEye(-14*u,-26*u, u, eo, EYE);
+  drawEye( 14*u,-26*u, u, eo, EYE);
+  drawMouth(0,-6*u,u,mouth);
+}
+function drawEye(ex,ey,u,open,EYE){
+  if(open>0.15){
+    ctx.fillStyle="#fff"; ctx.beginPath(); ctx.ellipse(ex,ey,9*u,11*u*open,0,0,7); ctx.fill();
+    ctx.fillStyle=EYE;   ctx.beginPath(); ctx.ellipse(ex+0.5*u,ey+1*u,6*u,8*u*open,0,0,7); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.beginPath(); ctx.ellipse(ex-2.5*u,ey-3*u*open,3*u,3*u*open,0,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(ex+2.5*u,ey+3*u*open,1.4*u,1.4*u*open,0,0,7); ctx.fill();
+  }else{
+    ctx.strokeStyle=EYE; ctx.lineWidth=2.8*u; ctx.lineCap="round";
+    ctx.beginPath(); ctx.arc(ex,ey,8*u,0.12*Math.PI,0.88*Math.PI); ctx.stroke();
+  }
+}
+function drawMouth(mx,my,u,open){
+  const w=17*u;
+  if(open<0.18){
+    ctx.strokeStyle="#5a2f2f"; ctx.lineWidth=2.6*u; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(mx-w,my); ctx.quadraticCurveTo(mx,my+8*u,mx+w,my); ctx.stroke();
+    ctx.fillStyle="#fff";
+    ctx.beginPath(); ctx.moveTo(mx-5*u,my+2*u); ctx.lineTo(mx-1.5*u,my+2*u); ctx.lineTo(mx-3.2*u,my+5.5*u); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(mx+1.5*u,my+2*u); ctx.lineTo(mx+5*u,my+2*u); ctx.lineTo(mx+3.2*u,my+5.5*u); ctx.closePath(); ctx.fill();
+  }else{
+    const h=open*16*u;
+    ctx.fillStyle="#8a4444";
+    ctx.beginPath();
+    ctx.moveTo(mx-w,my-1*u);
+    ctx.quadraticCurveTo(mx,my-6*u, mx+w,my-1*u);
+    ctx.quadraticCurveTo(mx+w,my+h, mx,my+h+3*u);
+    ctx.quadraticCurveTo(mx-w,my+h, mx-w,my-1*u);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#ef9a9a";
+    ctx.beginPath(); ctx.ellipse(mx,my+h*0.65,w*0.55,h*0.42+2*u,0,0,7); ctx.fill();
+    ctx.fillStyle="#fff";
+    for(let i=-2;i<=2;i++){ const tx2=mx+i*6.5*u; ctx.beginPath();
+      ctx.moveTo(tx2-2*u,my-2*u); ctx.lineTo(tx2+2*u,my-2*u); ctx.lineTo(tx2,my+1.5*u); ctx.closePath(); ctx.fill(); }
+    for(let i=-1;i<=1;i++){ const tx2=mx+i*7*u; ctx.beginPath();
+      ctx.moveTo(tx2-1.8*u,my+h); ctx.lineTo(tx2+1.8*u,my+h); ctx.lineTo(tx2,my+h-3.5*u); ctx.closePath(); ctx.fill(); }
+  }
+}
 setLang('zh-TW');
 </script></body></html>
