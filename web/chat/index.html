@@ -25,7 +25,7 @@ background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6)}
 <body>
 <canvas id="rig"></canvas>
 <div class="ui">
-  <div class="top"><b id="title"></b><div class="lang"><button id="zh" class="on">中文</button><button id="en">EN</button></div></div>
+  <div class="top"><b id="title"></b><div class="lang"><button id="spk" class="on" title="語音開關">🔊</button><button id="zh" class="on">中文</button><button id="en">EN</button></div></div>
   <div class="spacer"></div>
   <div id="log"></div>
   <div class="quick" id="quick"></div>
@@ -43,6 +43,15 @@ function setLang(l){ lang=l; $('zh').classList.toggle('on',l==='zh-TW'); $('en')
   $('inp').placeholder = l==='en'?'Tap to type…':'點我打字…'; renderQuick();
   document.documentElement.lang = l==='zh-TW'?'zh-Hant':'en'; }
 $('zh').onclick=()=>setLang('zh-TW'); $('en').onclick=()=>setLang('en');
+
+/* ===================== 語音 TTS（瀏覽器內建、離線） ===================== */
+let ttsOn=true, VOICES=[];
+function loadVoices(){ try{ VOICES = window.speechSynthesis ? speechSynthesis.getVoices() : []; }catch(e){ VOICES=[]; } }
+loadVoices(); if(window.speechSynthesis) speechSynthesis.onvoiceschanged = loadVoices;
+function pickVoice(want){ const pre=want.slice(0,2).toLowerCase();
+  return VOICES.find(v=>v.lang===want) || VOICES.find(v=>v.lang && v.lang.toLowerCase().startsWith(pre)) || null; }
+$('spk').onclick=()=>{ ttsOn=!ttsOn; $('spk').textContent = ttsOn?'🔊':'🔇'; $('spk').classList.toggle('on',ttsOn);
+  if(!ttsOn && window.speechSynthesis) speechSynthesis.cancel(); };
 function add(role,text){ const d=document.createElement('div'); d.className='msg '+(role==='user'?'me':'bot');
   d.textContent=text; $('log').appendChild(d); $('log').scrollTop=$('log').scrollHeight; }
 async function sendMsg(){ const text=$('inp').value.trim(); if(!text) return; $('inp').value='';
@@ -69,19 +78,35 @@ function done(){ if(--pending<=0){ hasReal = !!(IMG.body && IMG.eyes_open && IMG
 const cv=$('rig'), ctx=cv.getContext('2d');
 function resize(){ cv.width=innerWidth; cv.height=innerHeight; } resize(); addEventListener('resize',resize);
 let blink=0, blinkPhase="idle", blinkT0=0, nextBlink=900;
-let mouth=0, talkUntil=0;
+let mouth=0, talkUntil=0, talking=false;
 let px=0,py=0,tx=0,ty=0;
 addEventListener('mousemove',e=>{ tx=(e.clientX/innerWidth*2-1); ty=(e.clientY/innerHeight*2-1); });
 addEventListener('touchmove',e=>{const t=e.touches[0]; tx=(t.clientX/innerWidth*2-1); ty=(t.clientY/innerHeight*2-1);},{passive:true});
 function blinkNow(){ if(blinkPhase==="idle"){ blinkPhase="closing"; blinkT0=performance.now(); } }
-// 對嘴：時長依回覆長度估算（每字約 70ms，封頂 8 秒）
-function speak(textReply){ const ms=Math.min(8000, Math.max(1200,(textReply||'').length*70)); talkUntil=performance.now()+ms; }
+// 收到回覆 → 用瀏覽器 TTS 念出來，對嘴跟真實語音同步（onstart/onend）
+function speak(textReply){
+  const text=(textReply||'').trim(); if(!text) return;
+  const estMs=Math.min(8000, Math.max(1200, text.length*70));   // 沒語音引擎時的兜底時長
+  if(!ttsOn || !window.speechSynthesis){ talkUntil=performance.now()+estMs; return; }
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang = lang==='en' ? 'en-US' : 'zh-TW';
+    const v=pickVoice(u.lang); if(v) u.voice=v;
+    u.rate=1.0; u.pitch=1.25;                                    // 音調略高，較童趣
+    u.onstart=()=>{ talking=true; };
+    u.onend=()=>{ talking=false; };
+    u.onerror=()=>{ talking=false; talkUntil=performance.now()+estMs; };
+    talkUntil=performance.now()+estMs;                           // 兜底：onstart 沒觸發也會動嘴
+    speechSynthesis.speak(u);
+  }catch(e){ talkUntil=performance.now()+estMs; }
+}
 
 function loop(now){
   if(blinkPhase==="idle"){ nextBlink-=16; if(nextBlink<=0){ blinkNow(); } }
   if(blinkPhase==="closing"){ const k=(now-blinkT0)/90; blink=Math.min(1,k); if(k>=1){blinkPhase="opening";blinkT0=now;} }
   else if(blinkPhase==="opening"){ const k=(now-blinkT0)/130; blink=Math.max(0,1-k); if(k>=1){blinkPhase="idle";blink=0;nextBlink=2000+Math.random()*4000;} }
-  if(now<talkUntil){ mouth=Math.abs(Math.sin(now/70))*(0.55+Math.random()*0.45); } else mouth*=0.6;
+  if(talking || now<talkUntil){ mouth=Math.abs(Math.sin(now/70))*(0.55+Math.random()*0.45); } else mouth*=0.6;
   px+=(tx-px)*0.07; py+=(ty-py)*0.07;
   const t=now/1000, breathe=1+Math.sin(t*1.8)*0.02, bob=Math.sin(t*1.2)*8;
   ctx.clearRect(0,0,cv.width,cv.height);
