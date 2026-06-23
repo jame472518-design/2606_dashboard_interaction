@@ -1,0 +1,18 @@
+# 客戶設定（沒寫的項目會自動吃 config/global.yaml 的預設）
+display_name: "客戶顯示名稱"        # 首頁卡片與對話頁標題顯示的名字
+persona_file: persona/guide.md      # 人設檔位置（通常不用改）
+languages: [zh-TW, en]              # 此客戶支援的語言
+
+ui:
+  default_view: showcase            # showcase 全螢幕形象 / chat 直接開對話
+  voice_first: false
+
+voice:                              # 語音（前端 TTS）；不寫就吃全域預設
+  pitch: 1.1                        # 音調 0–2（高=童趣、低=沉穩）
+  rate: 1.0                         # 語速 0.5–2.0
+  zh_voice: ""                      # 指定中文語音名稱片段（例 "Hanhan"），空=自動
+  en_voice: ""                      # 指定英文語音名稱片段（例 "Zira"），空=自動
+
+# 想讓這個客戶用不同的對話模型，可加（不寫就吃 global.yaml）：
+# llm:
+#   model: qwen2.5:14b

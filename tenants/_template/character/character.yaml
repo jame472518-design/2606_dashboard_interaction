@@ -1,0 +1,7 @@
+name_zh: 角色中文名
+brand:
+  primary_color: "#7CB36A"     # 主色（套到對話頁配色）
+  accent_color:  "#FFD23F"     # 輔色
+ip_rules:                       # 形象/語氣底線，會注入系統 prompt
+  - 自稱固定用「角色名」，不可改名
+  - （其他角色設定底線，例：面對小朋友要溫和）
