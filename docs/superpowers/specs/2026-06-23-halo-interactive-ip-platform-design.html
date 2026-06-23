@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Halo 互動 IP 平台 — 設計文件</title>
+<style>
+  :root{
+    --bg:#0e1b24; --panel:#13242f; --ink:#e7f0f4; --muted:#9fb6c2;
+    --primary:#0A6E8C; --accent:#FFD23F; --line:#23414f; --code:#0a151c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(160deg,#0a141b,#10222d);color:var(--ink);
+    font-family:"Segoe UI","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.7}
+  .wrap{max-width:1000px;margin:0 auto;padding:48px 24px 96px}
+  header{border-bottom:2px solid var(--primary);padding-bottom:24px;margin-bottom:32px}
+  h1{margin:0 0 8px;font-size:2.1rem;letter-spacing:.5px}
+  h1 .dot{color:var(--accent)}
+  .meta{color:var(--muted);font-size:.92rem;display:flex;flex-wrap:wrap;gap:16px}
+  .meta b{color:var(--ink)}
+  h2{margin:48px 0 14px;font-size:1.45rem;border-left:5px solid var(--accent);padding-left:12px}
+  h3{margin:28px 0 10px;font-size:1.12rem;color:var(--accent)}
+  p{margin:10px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0;
+    box-shadow:0 8px 28px rgba(0,0,0,.25)}
+  .grid{display:grid;gap:16px}
+  @media(min-width:760px){.grid.two{grid-template-columns:1fr 1fr}}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.93rem}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:#16303d;color:var(--accent)}
+  tr:nth-child(even) td{background:#0f212b}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;
+    font-family:"Cascadia Code",Consolas,monospace;font-size:.84rem;color:#cfe6ef;line-height:1.5}
+  code{background:#16303d;padding:1px 6px;border-radius:5px;font-family:Consolas,monospace;font-size:.88em;color:#bfe3ef}
+  ul{margin:8px 0 8px 4px;padding-left:20px}
+  li{margin:5px 0}
+  .pill{display:inline-block;background:var(--primary);color:#fff;border-radius:999px;padding:3px 12px;font-size:.78rem;margin:2px 4px 2px 0}
+  .pill.accent{background:var(--accent);color:#222}
+  .good{color:#6ee7a8} .bad{color:#ff8b8b} .key{color:var(--accent)}
+  .mock{background:var(--code);border:1px dashed #2c4f60;border-radius:10px;padding:14px;
+    font-family:Consolas,monospace;font-size:.8rem;white-space:pre;overflow:auto;color:#bcd7e2}
+  .note{border-left:4px solid var(--accent);background:#16303d;padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+  .roadmap{display:grid;gap:10px}
+  .phase{display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:start;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .phase b{color:var(--accent)}
+  footer{margin-top:60px;color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:18px}
+  a{color:#7ec9e0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Halo 互動 IP 平台<span class="dot"> ·</span> 設計文件</h1>
+  <div class="meta">
+    <span><b>日期：</b>2026-06-23</span>
+    <span><b>狀態：</b>設計已確認，待寫實作計畫</span>
+    <span><b>硬體：</b>AMD Strix Halo · 32GB · Windows 11</span>
+    <span><b>場域：</b>展覽 / 體驗館 / 觀光</span>
+  </div>
+</header>
+
+<h2>1 · 目標與範圍</h2>
+<div class="card">
+  <p>在店內擺一台 Halo，作為<b>可互動的 IP 角色</b>。資料存本地，顧客可與 IP 對話。平台需<b>多客戶可抽換</b>：不同客戶 = 不同資料夾，統一首頁切換；設定外置，方便換模型與加客戶。</p>
+  <div class="grid two">
+    <div>
+      <h3>核心需求</h3>
+      <ul>
+        <li><span class="key">全本地</span>：離線可用、無月費、資料不外流</li>
+        <li><span class="key">多租戶</span>：加客戶／改人設／換模型只動資料夾與設定檔</li>
+        <li><span class="key">分階段</span>：先文字 kiosk，再疊加語音、形象、手機端</li>
+        <li><span class="key">雙語</span>：繁體中文 + 英文</li>
+        <li><span class="key">IP 形象一致</span>：忠實承載客戶官方外型，不 AI 即時生臉</li>
+      </ul>
+    </div>
+    <div>
+      <h3>非目標（YAGNI）</h3>
+      <ul>
+        <li>不做雲端後台 / 帳號系統</li>
+        <li>不落地顧客個資（僅短期對話記憶）</li>
+        <li>Phase 1 不做語音、不做 Live2D</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2>2 · 整體架構</h2>
+<div class="card">
+<div class="mock">店內螢幕 (Kiosk 瀏覽器, 全螢幕)
+        │
+        ▼
+本地 Web App ──► Orchestrator (對話協調層)
+                     │
+     ┌───────────────┼────────────────┐
+     ▼               ▼                ▼
+ 本地 LLM        知識庫 (RAG)       人設 / 形象規則
+ (Ollama)     向量檢索+結構化資料    (persona + ip_rules)</div>
+  <div class="note"><b>設計原則：</b>平台程式碼、客戶資料、設定三者解耦。LLM／知識庫／人設互不影響；語音與形象是後續「插件式」疊加，不動核心。</div>
+  <h3>技術選型（Phase 1）</h3>
+  <table>
+    <tr><th>元件</th><th>選擇</th><th>理由</th></tr>
+    <tr><td>LLM 執行</td><td>Ollama (Windows)</td><td>安裝簡單、API 穩定、Strix Halo 可用 Vulkan/ROCm 加速</td></tr>
+    <tr><td>對話模型</td><td>Qwen2.5 14B（起步）</td><td>32GB 跑得順、中英雙語強</td></tr>
+    <tr><td>知識庫</td><td>結構化 Markdown + RAG</td><td>回答有依據、不亂編</td></tr>
+    <tr><td>Embedding</td><td>bge-m3</td><td>全本地、中英文皆強</td></tr>
+    <tr><td>前端</td><td>本地網頁全螢幕 kiosk</td><td>後續階段沿用</td></tr>
+    <tr><td>後端</td><td>單一本地服務（實作計畫定案）</td><td>協調 LLM + RAG + 人設</td></tr>
+  </table>
+</div>
+
+<h2>3 · 部署模式（單一 server + 模式切換）</h2>
+<div class="card">
+  <p>同一套程式碼，用 <code>config/global.yaml</code> 的 <code>mode</code> 決定開機行為：</p>
+  <p><span class="pill">hub</span> 首頁列出所有 tenants，自由切換（開發／展示用）<br>
+     <span class="pill accent">single</span> 鎖定單一 tenant，開機直接進入該 IP，不顯示其他客戶（擺到客戶店裡時用）</p>
+<pre># config/global.yaml
+mode: hub                 # hub 首頁可切換 / single 鎖定一個客戶
+active_tenant: museum-A   # single 模式時生效
+llm:
+  provider: ollama
+  model: qwen2.5:14b      # ← 換模型只改這裡
+  base_url: http://localhost:11434
+embedding:
+  model: bge-m3
+server: { port: 8080, default_lang: zh-TW }</pre>
+  <div class="note">不採用「每客戶獨立 process/port」：實際每台 Halo 在店裡只服務一個客戶，single 模式即可達成隔離。</div>
+</div>
+
+<h2>4 · 目錄結構</h2>
+<div class="card">
+<pre>halo-ip-platform/
+├── config/
+│   └── global.yaml          # 全域：mode、預設 model、embedding、port、語言
+├── tenants/                  # 每個客戶/產品一個資料夾
+│   ├── _template/            # 新客戶範本（複製即用）
+│   ├── museum-A/
+│   │   ├── tenant.yaml       # 此客戶：名稱、語言、model 覆寫、ui
+│   │   ├── character/        # IP 形象包（見 §6）
+│   │   ├── persona/          # 人設 / system prompt
+│   │   ├── knowledge/        # 結構化知識資料 (md)
+│   │   ├── index/            # 向量索引（build 產物，可重建）
+│   │   └── assets/           # logo 等
+│   └── expo-B/ ...
+├── server/                   # 後端協調服務
+└── web/
+    ├── home/                 # 統一首頁（hub 模式列出 tenants）
+    └── chat/                 # 對話頁</pre>
+<pre># tenants/museum-A/tenant.yaml
+display_name: "海洋博物館"
+persona_file: persona/guide.md
+languages: [zh-TW, en]
+llm: { model: qwen2.5:32b }   # 覆寫全域；沒寫就吃 global 預設
+ui:
+  default_view: showcase      # showcase 全螢幕形象 / chat 直接開對話
+  voice_first: true           # 預設語音優先（Phase 2）
+  chat_panel: { position: bottom, collapsible: true }
+  portrait:  { chat_scale: corner }</pre>
+</div>
+
+<h2>5 · 人設與知識庫資料結構</h2>
+<div class="card">
+  <p>原則：<b>人設一個檔、知識一條一個檔</b>，純文字 Markdown，非工程人員可編輯增刪。</p>
+  <div class="grid two">
+    <div>
+      <h3>人設檔 <code>persona/guide.md</code></h3>
+<pre>---
+name_zh: 小海
+name_en: Coral
+voice: 親切、口語、略帶俏皮
+languages: [zh-TW, en]
+---
+## 說話風格
+- 一次講重點。
+- 不確定就說「不太確定」，
+  引導去服務台 — 絕不亂編。
+## 開場白
+- zh-TW: 「嗨～我是小海！」
+- en: "Hi! I'm Coral."</pre>
+    </div>
+    <div>
+      <h3>知識庫 <code>knowledge/</code> — 一條一檔</h3>
+<pre>---
+id: exhibit-002
+type: exhibit   # exhibit/faq/info/story
+title: 深海發光生物區
+lang: zh-TW
+zone: 2F-A
+tags: [深海, 生物發光, 水母]
+---
+這一區展示深海中會發光的生物……</pre>
+      <ul>
+        <li>英文版另存 <code>exhibit-002.en.md</code>，依提問語言檢索</li>
+        <li><code>type: info</code>（時間/票價/廁所）→ 首頁快捷鈕</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note"><b>索引 build：</b>掃 <code>knowledge/</code> → 切塊 → 算 embedding → 存本地向量庫。資料增修後重跑一次，不碰程式碼。</div>
+</div>
+
+<h2>6 · IP 形象包（維持外型一致）</h2>
+<div class="card">
+  <p>每個 tenant 一個 <code>character/</code>，平台<b>忠實承載</b>客戶官方 IP，<span class="bad">不 AI 即時生成角色臉</span>。</p>
+  <div class="grid two">
+    <div>
+<pre>character/
+├── character.yaml   # 形象規格(單一真相來源)
+├── reference/       # 官方設定圖/表情表(角色聖經)
+├── portrait/        # P1 顯示用立繪
+├── expressions/     # idle/talking/happy/thinking
+└── live2d/          # P3 依官方外型製作</pre>
+    </div>
+    <div>
+<pre># character.yaml
+brand:
+  primary_color: "#0A6E8C"
+  accent_color:  "#FFD23F"
+  logo: character/reference/logo.png
+visual:
+  expressions:
+    idle:    .../idle.png
+    talking: .../talking.png
+ip_rules:                # 注入系統 prompt
+  - 自稱固定用「小海」，不可改名
+  - 不做違反角色設定的發言</pre>
+    </div>
+  </div>
+  <h3>維持外型一致的三原則</h3>
+  <ul>
+    <li><b>不 AI 生臉</b>：用官方立繪 + 表情圖依對話狀態切換 → 外型 <span class="good">100% 忠於原作</span></li>
+    <li><b>品牌套全畫面</b>：配色/字體/logo 套進整個 kiosk UI</li>
+    <li><b>跨階段不走樣</b>：Live2D 以官方設定圖為本去 rig；<code>ip_rules</code> 鎖名字與底線</li>
+  </ul>
+  <h3>客戶圖片輸入分級</h3>
+  <table>
+    <tr><th>層級</th><th>客戶提供</th><th>Phase 1</th><th>Phase 3</th></tr>
+    <tr><td>Tier 1 最低</td><td>1 張高解析立繪（透明 PNG）</td><td>直接用</td><td>單張圖做會說話頭像（SadTalker 類）／生成表情經核可</td></tr>
+    <tr><td>Tier 2 較好</td><td>立繪 + 一組表情圖</td><td>表情切換、零生成</td><td>表情更自然</td></tr>
+    <tr><td>Tier 3 最佳</td><td>PSD 分層原檔</td><td>—</td><td>正規 Live2D rig（眨眼/轉頭/嘴型同步）</td></tr>
+  </table>
+  <div class="note">一張圖即可起步；Live2D 關鍵在「分層」，素材清單把 PSD 分層檔列為加分項。圖片是設計素材，非餵給 LLM 的 runtime 輸入。自帶 IP 與沒有 IP 的客戶都支援。</div>
+</div>
+
+<h2>7 · Phase 1 MVP — 畫面與資料流</h2>
+<div class="card">
+  <h3>可收縮雙狀態畫面</h3>
+  <div class="grid two">
+    <div>
+      <p><b>狀態 A — 形象全螢幕</b>（預設、沉浸）</p>
+      <div class="mock">┌───────────────────────────┐
+│ [logo]              [中/EN] │
+│         ┌─────────┐         │
+│         │   IP    │         │
+│         │  立繪   │  ← 佔滿  │
+│         │         │   會動表情│
+│         └─────────┘         │
+│  「點我打字，或對我說話」    │
+│      ◦ 對我說話   ⌨ 打字     │
+└───────────────────────────┘</div>
+    </div>
+    <div>
+      <p><b>狀態 B — 展開對話</b>（點打字後滑出）</p>
+      <div class="mock">┌───────────────────────────┐
+│ [logo]              [中/EN] │
+│ ┌──┐  對話內容(一問一答)    │
+│ │IP│  ──────────────────    │
+│ └──┘  ──────────────────    │
+│ ┌───────────────────────┐  │
+│ │ 對話框 / 輸出區         │  │
+│ └───────────────────────┘  │
+│ [時間][票價][動線]          │
+│ ┌────────────┐[送出][▼收合]│
+│ └────────────┘             │
+└───────────────────────────┘</div>
+    </div>
+  </div>
+  <p>兩狀態行為由 <code>tenant.yaml</code> 的 <code>ui</code> 區塊客製（預設視圖、面板位置、是否可收合、形象縮放、語音優先）。</p>
+
+  <h3>對話資料流</h3>
+<pre>顧客輸入(中/EN)
+  → Orchestrator：
+      1. 判定語言（或用切換鈕）
+      2. query → embedding(bge-m3)
+      3. 從該 tenant 的 index 檢索 top-k 知識條目（對應語言）
+      4. 組 prompt：人設 + ip_rules + 檢索到的知識 + 近幾輪對話
+  → Ollama (Qwen2.5) 回答
+      ├─ 有命中知識 → 依據回答，立繪切「講話」
+      └─ 沒命中    → fallback：「這我不太確定，可以問服務台喔」
+  → 串流顯示回答 → 回到待機表情</pre>
+
+  <h3>關鍵規則</h3>
+  <ul>
+    <li><b>強制 grounding</b>：檢索不到相關知識走 fallback，不讓模型瞎掰</li>
+    <li><b>短期記憶、不存個資</b>：只留當前顧客近幾輪；閒置逾時（約 60 秒）清空回待機</li>
+    <li><b>快捷鈕來自知識庫</b>：<code>type: info</code> 條目做成一鍵按鈕</li>
+    <li><b>回應速度</b>：本地 14B 約數秒；串流逐字顯示讓等待有感</li>
+  </ul>
+
+  <div class="note"><b>Phase 1 驗收：</b>一台 Halo 全螢幕開機自動進入 → 選定 tenant（hub 切換 / single 鎖定）→ 顧客用中/英文字問展館問題、得到有依據回答、立繪切表情 → 換客戶/改人設/更新知識/換模型全靠改資料夾與設定檔。</div>
+</div>
+
+<h2>8 · 分階段路線圖</h2>
+<div class="card">
+  <div class="roadmap">
+    <div class="phase"><b>Phase 1</b><div>多租戶文字 kiosk + RAG + 形象切換 + 設定外置 — <span class="key">自己寫</span>（市面無現成多租戶 RAG kiosk）</div></div>
+    <div class="phase"><b>Phase 2</b><div>語音：本地 ASR (Whisper 類) + TTS — 整合 <span class="key">Open-LLM-VTuber</span> 元件（AMD 友善、MIT、吃 Ollama）</div></div>
+    <div class="phase"><b>Phase 3</b><div>會動會講話的虛擬形象 — Live2D（有 PSD 分層）或單張圖會說話頭像（SadTalker 類）</div></div>
+    <div class="phase"><b>Phase 4</b><div>QR → 手機端，Halo 當店內 WiFi 本地伺服器、多人同時用 — 沿用後端 API</div></div>
+  </div>
+
+  <h3>借 vs 自己做（網路調研結論）</h3>
+  <table>
+    <tr><th>項目</th><th>決策</th><th>說明</th></tr>
+    <tr><td>多租戶 + 設定外置 + RAG</td><td class="good">自己做</td><td>市面無此組合，是核心差異</td></tr>
+    <tr><td>語音 + Live2D（P2/P3）</td><td>借 Open-LLM-VTuber</td><td>MIT、支援非 NVIDIA GPU/CPU，適配 Strix Halo</td></tr>
+    <tr><td>RAG 博物館導覽</td><td>參考</td><td>VirtualMuseumGuide</td></tr>
+    <tr><td>Handcrafted Persona Engine</td><td class="bad">不用</td><td>雖為 kiosk/博物館用途，但只支援 Windows + NVIDIA CUDA，Strix Halo（AMD）用不了</td></tr>
+  </table>
+  <p>參考連結：
+    <a href="https://github.com/Open-LLM-VTuber/Open-LLM-VTuber">Open-LLM-VTuber</a> ·
+    <a href="https://github.com/fagenorn/handcrafted-persona-engine">Handcrafted Persona Engine</a> ·
+    <a href="https://github.com/MariusKras/VirtualMuseumGuide">VirtualMuseumGuide</a>
+  </p>
+</div>
+
+<footer>
+  Halo 互動 IP 平台設計文件 · 2026-06-23 · 對應 Markdown：<code>docs/superpowers/specs/2026-06-23-halo-interactive-ip-platform-design.md</code>
+</footer>
+
+</div>
+</body>
+</html>
