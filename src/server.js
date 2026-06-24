@@ -64,7 +64,7 @@ export function createServer() {
         if (!name || !/^[\w-]+$/.test(name)) return send(res, 400, { error: 'invalid tenant' });
         const cfg = await resolveConfig(name);
         // 只回前端需要的，不外洩 llm/embedding 等設定
-        return send(res, 200, { display_name: cfg.display_name || name, ui: cfg.ui || {}, voice: cfg.voice || {} });
+        return send(res, 200, { display_name: cfg.display_name || name, ui: cfg.ui || {}, voice: cfg.voice || {}, character: cfg.character || {} });
       }
       if (req.method === 'POST' && url.pathname === '/api/chat') {
         const { tenant, message, history, lang } = await readBody(req);

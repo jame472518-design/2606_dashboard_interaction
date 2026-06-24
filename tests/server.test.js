@@ -21,6 +21,7 @@ test('GET /api/tenant-config 回傳 voice（tenant 覆寫全域）', async () =>
   assert.equal(data.voice.pitch, 1.25);        // tenant 覆寫
   assert.equal(data.voice.enabled, true);      // 繼承全域
   assert.equal(data.display_name, '小恐龍樂園');
+  assert.equal(data.character.render, 'rig');  // 形象渲染模式（小恐龍用占位 rig）
   assert.equal(data.llm, undefined);           // 不外洩 llm 設定
 });
 

@@ -5,7 +5,8 @@
 *{box-sizing:border-box;margin:0;padding:0}html,body{height:100%;overflow:hidden}
 body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;color:#3b4a36;
 background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6)}
-#rig{position:fixed;inset:0;z-index:1}
+#rig,#l2d{position:fixed;inset:0;z-index:1}
+#l2d{display:none}
 .ui{position:relative;z-index:2;height:100vh;display:flex;flex-direction:column;pointer-events:none}
 .ui button,.ui input{pointer-events:auto}
 .top{display:flex;justify-content:space-between;align-items:center;padding:16px 22px}
@@ -24,6 +25,7 @@ background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6)}
 </style></head>
 <body>
 <canvas id="rig"></canvas>
+<canvas id="l2d"></canvas>
 <div class="ui">
   <div class="top"><b id="title"></b><div class="lang"><button id="spk" class="on" title="語音開關">🔊</button><button id="zh" class="on">中文</button><button id="en">EN</button></div></div>
   <div class="spacer"></div>
@@ -31,6 +33,9 @@ background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6)}
   <div class="quick" id="quick"></div>
   <div class="bar"><input id="inp" placeholder="點我打字…"><button id="send">送出</button></div>
 </div>
+<script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/cubism4.min.js"></script>
 <script>
 const tenant=new URLSearchParams(location.search).get('tenant');
 let lang='zh-TW', history=[];
@@ -48,10 +53,13 @@ $('zh').onclick=()=>setLang('zh-TW'); $('en').onclick=()=>setLang('en');
 let ttsOn=true, VOICES=[];
 // 語音設定（來自 global.yaml + tenant.yaml 合併，可逐租戶覆寫語調/語速/指定語音）
 let VOICECFG={ rate:1.0, pitch:1.1, zh_voice:'', en_voice:'' };
+let CHARCFG={ render:'rig', live2d_model:'' };   // 形象渲染設定（來自 global+tenant 合併）
+let cfgReady=false;
 fetch(`/api/tenant-config?tenant=${encodeURIComponent(tenant)}`).then(r=>r.json()).then(c=>{
   if(c && c.voice){ VOICECFG={ ...VOICECFG, ...c.voice };
     if(c.voice.enabled===false){ ttsOn=false; $('spk').textContent='🔇'; $('spk').classList.remove('on'); } }
-}).catch(()=>{});
+  if(c && c.character){ CHARCFG={ ...CHARCFG, ...c.character }; }
+}).catch(()=>{}).finally(()=>{ cfgReady=true; tryDecide(); });
 function loadVoices(){ try{ VOICES = window.speechSynthesis ? speechSynthesis.getVoices() : []; }catch(e){ VOICES=[]; } }
 loadVoices(); if(window.speechSynthesis) speechSynthesis.onvoiceschanged = loadVoices;
 function pickVoice(want){ const pre=want.slice(0,2).toLowerCase();
@@ -78,10 +86,10 @@ $('send').onclick=sendMsg; $('inp').addEventListener('keydown',e=>{ if(e.key==='
 /* ===================== 即時 rig（會動的暴龍）===================== */
 /* 缺真素材時畫程式占位暴龍；放入 /tenants/<t>/character/rig/*.png 自動替換 */
 const NAMES=["body","eyes_open","eyes_closed","mouth_closed","mouth_mid","mouth_open","cheeks","brows"];
-const IMG={}; let pending=NAMES.length, hasReal=false;
+const IMG={}; let pending=NAMES.length, hasReal=false, rigReady=false;
 NAMES.forEach(n=>{ const im=new Image(); im.onload=()=>{IMG[n]=im;done();}; im.onerror=()=>{done();};
   im.src=`/tenants/${tenant}/character/rig/${n}.png`; });
-function done(){ if(--pending<=0){ hasReal = !!(IMG.body && IMG.eyes_open && IMG.eyes_closed && IMG.mouth_closed && IMG.mouth_open); } }
+function done(){ if(--pending<=0){ hasReal = !!(IMG.body && IMG.eyes_open && IMG.eyes_closed && IMG.mouth_closed && IMG.mouth_open); rigReady=true; tryDecide(); } }
 
 const cv=$('rig'), ctx=cv.getContext('2d');
 function resize(){ cv.width=innerWidth; cv.height=innerHeight; } resize(); addEventListener('resize',resize);
@@ -125,7 +133,36 @@ function loop(now){
   ctx.restore();
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
+
+/* ===== 形象渲染決策：有真素材→canvas rig；否則看 render 設定 ===== */
+let renderMode=null;
+function tryDecide(){ if(renderMode || !rigReady || !cfgReady) return; decideRenderer(); }
+function decideRenderer(){
+  if(hasReal){ renderMode='rig'; startRig(); return; }                 // 客戶自家素材最優先
+  if(CHARCFG.render==='live2d' && CHARCFG.live2d_model){ renderMode='live2d'; startLive2D(); return; }
+  renderMode='rig'; startRig();                                         // 占位（程式畫的角色）
+}
+function startRig(){ $('rig').style.display='block'; $('l2d').style.display='none'; requestAnimationFrame(loop); }
+
+/* ===== Live2D 通用預設角色（會眨眼/呼吸/對嘴；缺真素材時用）===== */
+function startLive2D(){
+  $('l2d').style.display='block'; $('rig').style.display='none';
+  if(!window.PIXI || !PIXI.live2d){ renderMode='rig'; startRig(); return; }   // SDK 沒載入→降級
+  try{
+    PIXI.live2d.Live2DModel.registerTicker(PIXI.Ticker);
+    const app=new PIXI.Application({ view:$('l2d'), resizeTo:window, backgroundAlpha:0, antialias:true });
+    PIXI.live2d.Live2DModel.from(CHARCFG.live2d_model).then(model=>{
+      app.stage.addChild(model);
+      const layout=()=>{ const s=(Math.min(innerWidth,innerHeight)*0.82)/model.internalModel.height;
+        model.scale.set(s); model.anchor.set(0.5,0.5); model.position.set(innerWidth/2, innerHeight*0.46); };
+      layout(); addEventListener('resize',layout);
+      // 對嘴：講話時驅動 ParamMouthOpenY（眨眼/呼吸 Live2D 模型自帶）
+      app.ticker.add(()=>{ if(!model) return;
+        const v = talking ? Math.abs(Math.sin(performance.now()/70))*(0.4+Math.random()*0.6) : 0;
+        try{ model.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', v); }catch(e){} });
+    }).catch(()=>{ renderMode='rig'; startRig(); });   // 模型載入失敗→降級占位
+  }catch(e){ renderMode='rig'; startRig(); }
+}
 
 function drawReal(S){
   const im=IMG.body, ratio=im.width/im.height, w=S*ratio, h=S, x=-w/2, y=-h/2;

@@ -20,3 +20,7 @@ voice:                    # 語音預設（前端瀏覽器 TTS）；每個 tenan
   pitch: 1.1              # 音調 0–2（高=童趣、低=沉穩）
   zh_voice: ""            # 指定中文語音名稱片段（空=自動選；例 "Hanhan"）
   en_voice: ""            # 指定英文語音名稱片段（空=自動選；例 "Zira"）
+character:                # 形象渲染預設；客戶有自家 rig 素材時一律優先用素材
+  render: live2d          # live2d=用 Live2D 模型 / rig=用 canvas 圖層(或程式占位)
+  live2d_model: "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json"
+                          # 通用預設角色（Haru）；客戶給素材前先用它，之後換成自家模型/素材
