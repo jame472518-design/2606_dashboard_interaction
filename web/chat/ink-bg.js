@@ -70,8 +70,6 @@
   }
   function frame(){
     frameNo++;
-    // 閒置 4 秒以上才自動滴墨（你手動玩時不會自動亂滴；沒人時恢復待機流動）
-    if(frameNo%170===0 && performance.now()-lastInteract>4000) autoDrop();
     velStep(); densStep(mass,mass0,massT); densStep(cR,cR0,cRT); densStep(cG,cG0,cGT); densStep(cB,cB0,cBT);
     u0.fill(0); v0.fill(0); mass0.fill(0); cR0.fill(0); cG0.fill(0); cB0.fill(0);
     for(let k=0;k<SIZE;k++){ mass[k]*=FADE; cR[k]*=FADE; cG[k]*=FADE; cB[k]*=FADE; u[k]*=VDAMP; v[k]*=VDAMP; }
@@ -91,9 +89,7 @@
       addEventListener('mouseup', ()=>{ down=false; last=null; });
       cv.addEventListener('touchstart', e=>{ e.preventDefault(); down=true; manualDrop(e); }, {passive:false});
       cv.addEventListener('touchmove', e=>{ e.preventDefault(); if(down){ const c=cell(e); manualStir(c); last=c; } }, {passive:false});
-      // 開場先點兩滴，畫面不會空白
-      autoDrop(); setTimeout(autoDrop, 900);
-      requestAnimationFrame(frame);
+      requestAnimationFrame(frame);   // 純手動：點/拖才出墨，無自動定時噴發
     },
     setColor(rgb){ pickMode='fixed'; picked=rgb; },   // 調色盤選固定色
     setRandom(){ pickMode='random'; },                // 隨機色
