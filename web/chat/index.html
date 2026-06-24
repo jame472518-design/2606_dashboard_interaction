@@ -41,7 +41,7 @@ const tenant=new URLSearchParams(location.search).get('tenant');
 let lang='zh-TW', history=[];
 const $=id=>document.getElementById(id);
 $('title').textContent = tenant || '';
-const QUICK={ 'zh-TW':['營業時間','票價','推薦動線'], 'en':['Hours','Tickets','Suggested route'] };
+let QUICK={ 'zh-TW':['營業時間','票價','推薦動線'], 'en':['Hours','Tickets','Suggested route'] };  // 預設；由 tenant 設定覆寫
 function renderQuick(){ $('quick').innerHTML = QUICK[lang].map(q=>`<button>${q}</button>`).join('');
   [...$('quick').children].forEach(b=>b.onclick=()=>{ $('inp').value=b.textContent; sendMsg(); }); }
 function setLang(l){ lang=l; $('zh').classList.toggle('on',l==='zh-TW'); $('en').classList.toggle('on',l==='en');
@@ -54,11 +54,19 @@ let ttsOn=true, VOICES=[];
 // 語音設定（來自 global.yaml + tenant.yaml 合併，可逐租戶覆寫語調/語速/指定語音）
 let VOICECFG={ rate:1.0, pitch:1.1, zh_voice:'', en_voice:'' };
 let CHARCFG={ render:'rig', live2d_model:'' };   // 形象渲染設定（來自 global+tenant 合併）
+let THEME={ primary_color:'#7CB36A', primary_dark:'#4f8a45', accent_color:'#FFD23F', cream:'#FBF3E2' };
 let cfgReady=false;
 fetch(`/api/tenant-config?tenant=${encodeURIComponent(tenant)}`).then(r=>r.json()).then(c=>{
   if(c && c.voice){ VOICECFG={ ...VOICECFG, ...c.voice };
     if(c.voice.enabled===false){ ttsOn=false; $('spk').textContent='🔇'; $('spk').classList.remove('on'); } }
   if(c && c.character){ CHARCFG={ ...CHARCFG, ...c.character }; }
+  if(c && c.ui && c.ui.quick){ QUICK={ ...QUICK, ...c.ui.quick }; renderQuick(); }   // 快捷鈕來自設定
+  if(c && c.theme){ THEME={ ...THEME, ...c.theme };                                   // 配色套到 CSS 變數
+    const rs=document.documentElement.style;
+    rs.setProperty('--green', THEME.primary_color);
+    rs.setProperty('--green-dark', THEME.primary_dark);
+    rs.setProperty('--cream', THEME.cream);
+    rs.setProperty('--accent', THEME.accent_color); }
 }).catch(()=>{}).finally(()=>{ cfgReady=true; tryDecide(); });
 function loadVoices(){ try{ VOICES = window.speechSynthesis ? speechSynthesis.getVoices() : []; }catch(e){ VOICES=[]; } }
 loadVoices(); if(window.speechSynthesis) speechSynthesis.onvoiceschanged = loadVoices;

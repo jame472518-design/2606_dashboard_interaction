@@ -1,0 +1,25 @@
+display_name: "光蘊複合概念園區"
+persona_file: persona/guide.md
+languages: [zh-TW, en]
+ui:
+  default_view: showcase
+  voice_first: false
+  quick:                              # 每個都對應一條知識，按了不會落空
+    zh-TW: ['營業時間', '怎麼去', '咖啡推薦', '工作坊預約']
+    en:    ['Hours', 'Getting here', 'Cafe picks', 'Book a workshop']
+  fallback:
+    zh-TW: '這個我不太確定耶，去服務台問問看會更準喔！'
+    en:    "I'm not sure about that one — our front desk can help!"
+voice:
+  pitch: 1.05
+  rate: 1.0
+  zh_voice: "Hanhan"
+  en_voice: "Zira"
+character:
+  render: live2d                      # 招商預設角色（Haru）；客戶簽約後換成自家形象
+  live2d_model: "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json"
+theme:                                # 招商主題：清新藍 + 暖橘
+  primary_color: "#5B8DEF"
+  primary_dark:  "#3A5FB0"
+  accent_color:  "#FFB454"
+  cream:         "#F4F1FB"

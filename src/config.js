@@ -11,7 +11,7 @@ async function readYaml(p) {
 
 function merge(base, over) {
   const out = { ...base, ...over };
-  for (const k of ['llm', 'embedding', 'server', 'retrieval', 'ui', 'voice', 'character']) {
+  for (const k of ['llm', 'embedding', 'server', 'retrieval', 'ui', 'voice', 'character', 'theme']) {
     if (base[k] || over[k]) out[k] = { ...(base[k] || {}), ...(over[k] || {}) };
   }
   return out;

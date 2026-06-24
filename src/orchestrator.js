@@ -7,7 +7,8 @@ export function decideGrounded(hits, minScore) {
   return hits.length > 0 && hits[0].score >= minScore;
 }
 
-export function fallbackReply(lang) {
+export function fallbackReply(lang, map = {}) {
+  if (map && map[lang]) return map[lang];   // tenant 自訂的兜底句
   return lang === 'en'
     ? "I'm not sure about that — please ask our front desk!"
     : '這我不太確定，可以問問服務台喔！';
@@ -68,7 +69,7 @@ export async function answer({ tenantName, message, history = [], lang }) {
   try {
     reply = await chat({ messages, model: cfg.llm.model, baseUrl: cfg.llm.base_url });
   } catch {
-    reply = fallbackReply(useLang);   // LLM 出錯時的兜底
+    reply = fallbackReply(useLang, cfg.ui?.fallback);   // LLM 出錯時的兜底（可由 tenant 自訂）
   }
   return { reply, grounded, sources: grounded ? hits.map(h => ({ id: h.id, title: h.title, score: h.score })) : [] };
 }

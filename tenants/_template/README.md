@@ -17,5 +17,14 @@
    非恐龍主題的客戶建議提供自己的 rig 素材）。
 8. `npm start` → 首頁就會出現這個客戶；single 模式則在 config/global.yaml 設 active_tenant。
 
+## tenant.yaml 可設定的欄位（沒寫就吃 config/global.yaml 預設）
+- `ui.quick`：快捷鈕（zh-TW / en 各一組）。**要對應你實際有的知識**，按了才不會落空。
+- `ui.fallback`：LLM 出錯時的兜底句（一般不會用到，沒命中知識是走人設寒暄）。
+- `theme`：UI 配色（primary_color / primary_dark / accent_color / cream），會套到對話頁。
+- `voice`：語音 pitch / rate / zh_voice / en_voice。
+- `character.render`：`live2d`（+ live2d_model）或 `rig`（放 character/rig/*.png）。
+
+> 完整範例可參考招商 demo 租戶 `tenants/demo_aurora_park/`（複合園區，16 條知識涵蓋餐飲/零售/觀光/預約，配色與快捷鈕都客製）。
+
 ## 不用動程式碼
-換模型、加客戶、改人設、調語音、更新知識，全部只動 `config/` 與 `tenants/` 裡的設定檔與資料夾。
+換模型、加客戶、改人設、調語音、改配色、改快捷鈕、更新知識，全部只動 `config/` 與 `tenants/` 裡的設定檔與資料夾。

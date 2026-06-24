@@ -22,6 +22,8 @@ test('GET /api/tenant-config 回傳 voice（tenant 覆寫全域）', async () =>
   assert.equal(data.voice.enabled, true);      // 繼承全域
   assert.equal(data.display_name, '小恐龍樂園');
   assert.equal(data.character.render, 'rig');  // 形象渲染模式（小恐龍用占位 rig）
+  assert.ok(Array.isArray(data.ui.quick['zh-TW']));   // 快捷鈕來自設定
+  assert.equal(data.theme.primary_color, '#7CB36A');  // 配色來自設定（小恐龍吃全域綠）
   assert.equal(data.llm, undefined);           // 不外洩 llm 設定
 });
 
