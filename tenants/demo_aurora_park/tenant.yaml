@@ -4,6 +4,7 @@ languages: [zh-TW, en]
 ui:
   default_view: showcase
   voice_first: false
+  background: ink                     # 待機墨流光影背景（墨色用品牌色）
   quick:                              # 每個都對應一條知識，按了不會落空
     zh-TW: ['營業時間', '怎麼去', '咖啡推薦', '工作坊預約']
     en:    ['Hours', 'Getting here', 'Cafe picks', 'Book a workshop']

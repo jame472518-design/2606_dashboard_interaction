@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>墨流し · Suminagashi 互動水墨</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#efe7d2}
+  body{font-family:"PingFang TC","Microsoft JhengHei",serif;cursor:crosshair;touch-action:none}
+  #c{display:block;width:100vw;height:100vh}
+  .hint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:3;
+    color:#5b5240;font-size:.95rem;letter-spacing:.05em;font-weight:600;
+    background:rgba(247,241,226,.7);padding:8px 18px;border-radius:999px;backdrop-filter:blur(4px);
+    pointer-events:none;user-select:none;transition:opacity 1s}
+  .title{position:fixed;left:50%;transform:translateX(-50%);top:18px;z-index:3;color:#3b3322;pointer-events:none;user-select:none;text-align:center}
+  .title b{font-size:1.2rem;letter-spacing:.18em}
+  .title span{display:block;font-size:.68rem;color:#8a7e63;letter-spacing:.25em;margin-top:2px}
+  /* 左側調色盤 */
+  .palette{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:4;
+    display:flex;flex-direction:column;gap:10px;background:rgba(247,241,226,.78);
+    padding:12px 10px;border-radius:18px;box-shadow:0 6px 20px rgba(0,0,0,.1);backdrop-filter:blur(5px)}
+  .swatch{width:34px;height:34px;border-radius:50%;cursor:pointer;border:3px solid transparent;
+    transition:transform .12s, border-color .12s}
+  .swatch:hover{transform:scale(1.12)}
+  .swatch.on{border-color:#3b3322;transform:scale(1.12)}
+  .swatch.rand{background:conic-gradient(#1C2A5C,#B23A2A,#C7902E,#1F6B47,#5E3C8C,#1C2A5C);
+    display:grid;place-items:center;font-size:14px}
+  .tools{position:fixed;right:18px;top:18px;z-index:4}
+  .tools button{border:0;background:rgba(247,241,226,.85);color:#5b5240;font-weight:700;
+    padding:9px 15px;border-radius:999px;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="title"><b>墨流し</b><span>SUMINAGASHI</span></div>
+<div class="palette" id="palette"></div>
+<div class="tools"><button id="clear">清水 Clear</button></div>
+<div class="hint" id="hint">左側選色 ・ 點一下滴墨 ・ 拖曳攪動　|　Pick a color · Click to drop · Drag to stir</div>
+<script>
+// ============ 簡化版 Stable Fluids（Jos Stam）：速度場帶動「墨量 + 顏色」 ============
+const N = 100;
+const SIZE = (N + 2) * (N + 2);
+const IX = (i, j) => i + (N + 2) * j;
+const dt = 0.11, visc = 0.00002, diff = 0.00003;  // 降低自我摊薄 → 墨更聚、更濃、更持久
+const FADE = 0.9995;     // 墨保留更久
+const VDAMP = 0.999;     // 水流留更久 → 擴散持續更久不停
+const SHOW = 0.12;       // 顯色係數加倍（更濃，摊薄後仍看得清）
+
+const u = new Float32Array(SIZE), v = new Float32Array(SIZE);
+const u0 = new Float32Array(SIZE), v0 = new Float32Array(SIZE);
+// 墨：mass=總量(做流體)，cR/cG/cB=顏色×量的累積（除以 mass 得平均色 → 任意色＋自然混色）
+const mass = new Float32Array(SIZE), mass0 = new Float32Array(SIZE), massT = new Float32Array(SIZE);
+const cR = new Float32Array(SIZE), cR0 = new Float32Array(SIZE), cRT = new Float32Array(SIZE);
+const cG = new Float32Array(SIZE), cG0 = new Float32Array(SIZE), cGT = new Float32Array(SIZE);
+const cB = new Float32Array(SIZE), cB0 = new Float32Array(SIZE), cBT = new Float32Array(SIZE);
+
+function addSource(x, s){ for(let i=0;i<SIZE;i++) x[i]+=dt*s[i]; }
+function setBnd(b, x){
+  for(let i=1;i<=N;i++){
+    x[IX(0,i)]=b===1?-x[IX(1,i)]:x[IX(1,i)]; x[IX(N+1,i)]=b===1?-x[IX(N,i)]:x[IX(N,i)];
+    x[IX(i,0)]=b===2?-x[IX(i,1)]:x[IX(i,1)]; x[IX(i,N+1)]=b===2?-x[IX(i,N)]:x[IX(i,N)];
+  }
+  x[IX(0,0)]=0.5*(x[IX(1,0)]+x[IX(0,1)]); x[IX(0,N+1)]=0.5*(x[IX(1,N+1)]+x[IX(0,N)]);
+  x[IX(N+1,0)]=0.5*(x[IX(N,0)]+x[IX(N+1,1)]); x[IX(N+1,N+1)]=0.5*(x[IX(N,N+1)]+x[IX(N+1,N)]);
+}
+function lin(b,x,x0,a,c,iter){ for(let k=0;k<iter;k++){
+  for(let j=1;j<=N;j++)for(let i=1;i<=N;i++)
+    x[IX(i,j)]=(x0[IX(i,j)]+a*(x[IX(i-1,j)]+x[IX(i+1,j)]+x[IX(i,j-1)]+x[IX(i,j+1)]))/c;
+  setBnd(b,x);} }
+function diffuse(b,x,x0,d,iter){ const a=dt*d*N*N; lin(b,x,x0,a,1+4*a,iter); }
+function advect(b,d,d0,uu,vv){ const dt0=dt*N;
+  for(let j=1;j<=N;j++)for(let i=1;i<=N;i++){
+    let x=i-dt0*uu[IX(i,j)], y=j-dt0*vv[IX(i,j)];
+    if(x<0.5)x=0.5; if(x>N+0.5)x=N+0.5; if(y<0.5)y=0.5; if(y>N+0.5)y=N+0.5;
+    const i0=x|0,i1=i0+1,j0=y|0,j1=j0+1, s1=x-i0,s0=1-s1,t1=y-j0,t0=1-t1;
+    d[IX(i,j)]=s0*(t0*d0[IX(i0,j0)]+t1*d0[IX(i0,j1)])+s1*(t0*d0[IX(i1,j0)]+t1*d0[IX(i1,j1)]);
+  } setBnd(b,d);
+}
+function project(uu,vv,p,div){ const h=1/N;
+  for(let j=1;j<=N;j++)for(let i=1;i<=N;i++){ div[IX(i,j)]=-0.5*h*(uu[IX(i+1,j)]-uu[IX(i-1,j)]+vv[IX(i,j+1)]-vv[IX(i,j-1)]); p[IX(i,j)]=0; }
+  setBnd(0,div); setBnd(0,p); lin(0,p,div,1,4,14);
+  for(let j=1;j<=N;j++)for(let i=1;i<=N;i++){ uu[IX(i,j)]-=0.5*(p[IX(i+1,j)]-p[IX(i-1,j)])/h; vv[IX(i,j)]-=0.5*(p[IX(i,j+1)]-p[IX(i,j-1)])/h; }
+  setBnd(1,uu); setBnd(2,vv);
+}
+function velStep(){
+  addSource(u,u0); addSource(v,v0);
+  diffuse(1,u0,u,visc,12); diffuse(2,v0,v,visc,12);
+  project(u0,v0,u,v);
+  advect(1,u,u0,u0,v0); advect(2,v,v0,u0,v0);
+  project(u,v,u0,v0);
+}
+// 一個欄位的 density step（source 緩衝 src，臨時 tmp）
+function densStep(d, src, tmp){
+  addSource(d, src);
+  diffuse(0, tmp, d, diff, 6);   // tmp = 擴散後
+  advect(0, d, tmp, u, v);       // d = 平流後
+}
+
+// ============ 渲染 ============
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+const off=document.createElement('canvas'); off.width=N+2; off.height=N+2;
+const octx=off.getContext('2d'); const img=octx.createImageData(N+2,N+2);
+let W,H; function resize(){ W=cv.width=innerWidth; H=cv.height=innerHeight; } resize(); addEventListener('resize',resize);
+const BG=[242,235,217];
+function render(){
+  const data=img.data;
+  for(let j=0;j<N+2;j++)for(let i=0;i<N+2;i++){
+    const k=IX(i,j), idx=k*4, m=mass[k];
+    const ink=Math.min(1, m*SHOW);
+    let r=BG[0],g=BG[1],b=BG[2];
+    if(m>0.0001){ const cr=cR[k]/m, cg=cG[k]/m, cb=cB[k]/m;
+      r=BG[0]*(1-ink)+cr*ink; g=BG[1]*(1-ink)+cg*ink; b=BG[2]*(1-ink)+cb*ink; }
+    data[idx]=r; data[idx+1]=g; data[idx+2]=b; data[idx+3]=255;
+  }
+  octx.putImageData(img,0,0);
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(off,1,1,N,N,0,0,W,H);
+  drawWashi();
+}
+let washi=null;
+function drawWashi(){
+  if(!washi){ washi=document.createElement('canvas'); washi.width=200; washi.height=200;
+    const wc=washi.getContext('2d'); const id=wc.createImageData(200,200);
+    for(let k=0;k<200*200;k++){ const n=(Math.sin(k*12.9898)*43758.5)%1; const val=(n<0?-n:n);
+      const gg=235+val*16; id.data[k*4]=gg; id.data[k*4+1]=gg-4; id.data[k*4+2]=gg-18; id.data[k*4+3]=10; }
+    wc.putImageData(id,0,0);
+  }
+  ctx.globalAlpha=0.5; ctx.fillStyle=ctx.createPattern(washi,'repeat'); ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
+}
+
+// ============ 調色盤 ============
+const COLORS=[
+  {name:'靛藍', rgb:[28,42,92]},
+  {name:'墨黑', rgb:[24,24,32]},
+  {name:'朱紅', rgb:[178,58,42]},
+  {name:'松綠', rgb:[31,107,71]},
+  {name:'赭黃', rgb:[199,144,46]},
+  {name:'桔梗紫',rgb:[94,60,140]},
+  {name:'藍綠', rgb:[31,122,140]},
+];
+let randomMode=true, currentColor=COLORS[0].rgb;
+const pal=document.getElementById('palette');
+const rand=document.createElement('div'); rand.className='swatch rand on'; rand.title='隨機 Random'; rand.textContent='🎲';
+rand.onclick=()=>{ randomMode=true; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('on')); rand.classList.add('on'); };
+pal.appendChild(rand);
+COLORS.forEach(c=>{ const s=document.createElement('div'); s.className='swatch'; s.title=c.name;
+  s.style.background=`rgb(${c.rgb[0]},${c.rgb[1]},${c.rgb[2]})`;
+  s.onclick=()=>{ randomMode=false; currentColor=c.rgb; document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('on')); s.classList.add('on'); };
+  pal.appendChild(s); });
+function inkColor(){ return randomMode ? COLORS[(Math.random()*COLORS.length)|0].rgb : currentColor; }
+
+// ============ 互動：注入 ============
+let last=null, down=false, dropColor=COLORS[0].rgb;
+function cellFromEvent(e){ const p=e.touches?e.touches[0]:e;
+  return { i:Math.max(1,Math.min(N,((p.clientX/W)*N)|0)), j:Math.max(1,Math.min(N,((p.clientY/H)*N)|0)), x:p.clientX, y:p.clientY }; }
+function splatInk(i,j,amt,col){
+  for(let dj=-2;dj<=2;dj++)for(let di=-2;di<=2;di++){
+    const ii=i+di,jj=j+dj; if(ii<1||ii>N||jj<1||jj>N)continue;
+    const fall=Math.max(0,1-(di*di+dj*dj)/8), a=amt*fall, k=IX(ii,jj);
+    mass0[k]+=a; cR0[k]+=a*col[0]; cG0[k]+=a*col[1]; cB0[k]+=a*col[2];
+  }
+}
+function dropClick(e){
+  const {i,j}=cellFromEvent(e); dropColor=inkColor();
+  splatInk(i,j,420,dropColor);
+  const F=14;   // 滴墨向外速度（外圈各點注入，方向不互相抵消）
+  for(let a=0;a<12;a++){ const ang=a/12*Math.PI*2;
+    const oi=Math.round(i+Math.cos(ang)*2.5), oj=Math.round(j+Math.sin(ang)*2.5);
+    if(oi<1||oi>N||oj<1||oj>N)continue;
+    u0[IX(oi,oj)]+=Math.cos(ang)*F; v0[IX(oi,oj)]+=Math.sin(ang)*F;
+  }
+}
+function stir(c){ if(!last)return;
+  for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){ const ii=c.i+di,jj=c.j+dj; if(ii<1||ii>N||jj<1||jj>N)continue;
+    u0[IX(ii,jj)]+=(c.x-last.x)*0.45; v0[IX(ii,jj)]+=(c.y-last.y)*0.45; }
+  splatInk(c.i,c.j,75,dropColor);
+}
+cv.addEventListener('mousedown',e=>{ down=true; last=cellFromEvent(e); dropClick(e); });
+cv.addEventListener('mousemove',e=>{ if(!down)return; const c=cellFromEvent(e); stir(c); last=c; });
+addEventListener('mouseup',()=>{ down=false; last=null; });
+cv.addEventListener('touchstart',e=>{ e.preventDefault(); down=true; last=cellFromEvent(e); dropClick(e); },{passive:false});
+cv.addEventListener('touchmove',e=>{ e.preventDefault(); if(!down)return; const c=cellFromEvent(e); stir(c); last=c; },{passive:false});
+document.getElementById('clear').onclick=()=>{ mass.fill(0);cR.fill(0);cG.fill(0);cB.fill(0);u.fill(0);v.fill(0); };
+setTimeout(()=>{ const h=document.getElementById('hint'); if(h)h.style.opacity='0'; },6500);
+
+// ============ 主迴圈 ============
+function frame(){
+  velStep();
+  densStep(mass, mass0, massT);
+  densStep(cR, cR0, cRT);
+  densStep(cG, cG0, cGT);
+  densStep(cB, cB0, cBT);
+  u0.fill(0); v0.fill(0); mass0.fill(0); cR0.fill(0); cG0.fill(0); cB0.fill(0);
+  for(let k=0;k<SIZE;k++){ mass[k]*=FADE; cR[k]*=FADE; cG[k]*=FADE; cB[k]*=FADE; u[k]*=VDAMP; v[k]*=VDAMP; }
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

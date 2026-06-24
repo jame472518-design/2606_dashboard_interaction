@@ -5,7 +5,8 @@
 *{box-sizing:border-box;margin:0;padding:0}html,body{height:100%;overflow:hidden}
 body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;color:#3b4a36;
 background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6)}
-#rig,#l2d{position:fixed;inset:0;z-index:1}
+#ink{position:fixed;inset:0;z-index:0;pointer-events:auto}   /* 背景接收手動滴墨 */
+#rig,#l2d{position:fixed;inset:0;z-index:1;pointer-events:none}  /* 角色層讓點擊穿透到背景 */
 #l2d{display:none}
 .ui{position:relative;z-index:2;height:100vh;display:flex;flex-direction:column;pointer-events:none}
 .ui button,.ui input{pointer-events:auto}
@@ -22,8 +23,15 @@ background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6)}
 .bar{display:flex;gap:8px;padding:12px 22px 18px}
 .bar input{flex:1;padding:14px;border:2px solid #d8c9a6;border-radius:14px;font-size:1.05rem;background:#fff}
 .bar button{border:0;background:var(--green);color:#fff;font-weight:800;padding:0 22px;border-radius:14px;cursor:pointer}
+.ink-palette{position:fixed;left:14px;top:50%;transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;gap:9px;
+  background:rgba(255,255,255,.55);padding:10px 8px;border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,.08);backdrop-filter:blur(4px)}
+.ink-sw{width:30px;height:30px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:transform .12s}
+.ink-sw:hover{transform:scale(1.12)} .ink-sw.on{border-color:#3b3322;transform:scale(1.12)}
+.ink-sw.rand{background:conic-gradient(#1C2A5C,#B23A2A,#C7902E,#1F6B47,#5E3C8C,#1C2A5C);display:grid;place-items:center;font-size:13px}
+.ink-sw.ink-clear{background:#fff;color:#8a7e63;display:grid;place-items:center;font-size:13px;font-weight:800;margin-top:4px;border-top:1px solid rgba(0,0,0,.06)}
 </style></head>
 <body>
+<canvas id="ink"></canvas>
 <canvas id="rig"></canvas>
 <canvas id="l2d"></canvas>
 <div class="ui">
@@ -33,6 +41,7 @@ background:radial-gradient(120% 80% at 50% 0%,#fffaf0,#efe2c6)}
   <div class="quick" id="quick"></div>
   <div class="bar"><input id="inp" placeholder="點我打字…"><button id="send">送出</button></div>
 </div>
+<script src="/web/chat/ink-bg.js"></script>
 <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/cubism4.min.js"></script>
@@ -48,6 +57,24 @@ function setLang(l){ lang=l; $('zh').classList.toggle('on',l==='zh-TW'); $('en')
   $('inp').placeholder = l==='en'?'Tap to type…':'點我打字…'; renderQuick();
   document.documentElement.lang = l==='zh-TW'?'zh-Hant':'en'; }
 $('zh').onclick=()=>setLang('zh-TW'); $('en').onclick=()=>setLang('en');
+
+/* ===================== 墨流背景調色盤 ===================== */
+const INK_COLORS=[
+  {name:'靛藍',rgb:[28,42,92]},{name:'墨黑',rgb:[24,24,32]},{name:'朱紅',rgb:[178,58,42]},
+  {name:'松綠',rgb:[31,107,71]},{name:'赭黃',rgb:[199,144,46]},{name:'桔梗紫',rgb:[94,60,140]},{name:'藍綠',rgb:[31,122,140]}
+];
+function buildInkPalette(){
+  const pal=document.createElement('div'); pal.className='ink-palette';
+  const sel=el=>{ pal.querySelectorAll('.ink-sw').forEach(x=>x.classList.remove('on')); el.classList.add('on'); };
+  const rand=document.createElement('div'); rand.className='ink-sw rand on'; rand.title='隨機 Random'; rand.textContent='🎲';
+  rand.onclick=()=>{ InkBackground.setRandom(); sel(rand); }; pal.appendChild(rand);
+  INK_COLORS.forEach(c=>{ const s=document.createElement('div'); s.className='ink-sw'; s.title=c.name;
+    s.style.background=`rgb(${c.rgb[0]},${c.rgb[1]},${c.rgb[2]})`;
+    s.onclick=()=>{ InkBackground.setColor(c.rgb); sel(s); }; pal.appendChild(s); });
+  const clr=document.createElement('div'); clr.className='ink-sw ink-clear'; clr.title='清水 Clear'; clr.textContent='清';
+  clr.onclick=()=>InkBackground.clear(); pal.appendChild(clr);
+  document.body.appendChild(pal);
+}
 
 /* ===================== 語音 TTS（瀏覽器內建、離線） ===================== */
 let ttsOn=true, VOICES=[];
@@ -67,6 +94,13 @@ fetch(`/api/tenant-config?tenant=${encodeURIComponent(tenant)}`).then(r=>r.json(
     rs.setProperty('--green-dark', THEME.primary_dark);
     rs.setProperty('--cream', THEME.cream);
     rs.setProperty('--accent', THEME.accent_color); }
+  // 待機墨流光影背景（由 ui.background 開關，墨色用品牌色）
+  if(c && c.ui && c.ui.background==='ink' && window.InkBackground){
+    const hex2rgb=h=>{ const n=parseInt(String(h).replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; };
+    const cols=[THEME.primary_dark, THEME.primary_color, THEME.accent_color].map(hex2rgb);
+    InkBackground.start(document.getElementById('ink'), { colors: cols });
+    buildInkPalette();
+  }
 }).catch(()=>{}).finally(()=>{ cfgReady=true; tryDecide(); });
 function loadVoices(){ try{ VOICES = window.speechSynthesis ? speechSynthesis.getVoices() : []; }catch(e){ VOICES=[]; } }
 loadVoices(); if(window.speechSynthesis) speechSynthesis.onvoiceschanged = loadVoices;
